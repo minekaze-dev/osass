@@ -139,6 +139,7 @@ export const AREAS = [
 ];
 
 export const LEAD_SOURCES = [
+  'MGM',
   'Qiscus FB',
   'Qiscus Live Chat',
   'Qiscus Website',

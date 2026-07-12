@@ -62,8 +62,8 @@ export default function LeadFormModal({
         setName('');
         setAddress('');
         setArea(AREAS[0]);
-        setSource('Whatsapp');
-        setPackageInterest(PACKAGES[0]);
+        setSource('MGM');
+        setPackageInterest('-');
         setNotes('');
         setPipeline('Lead Baru');
         setStatus('Interested');
@@ -136,6 +136,7 @@ export default function LeadFormModal({
         status,
         pipeline,
         nextReminderDate: nextReminder,
+        closingStatus: 'Not Closed',
       });
     }
     
