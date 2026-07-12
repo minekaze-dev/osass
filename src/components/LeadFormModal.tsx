@@ -74,7 +74,15 @@ export default function LeadFormModal({
 
   // Handle WhatsApp change and check duplicates
   const handleWhatsappChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, ''); // Limit to numbers only
+    let val = e.target.value.replace(/\D/g, ''); // Limit to numbers only
+
+    // Replace 62 prefix with 0, or prepend 0 if not present
+    if (val.startsWith('62')) {
+      val = '0' + val.substring(2);
+    } else if (val.length > 0 && !val.startsWith('0')) {
+      val = '0' + val;
+    }
+
     setWhatsapp(val);
 
     if (val.length >= 8) {

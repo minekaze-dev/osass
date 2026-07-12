@@ -977,7 +977,7 @@ export default function App() {
       
       {/* Footer */}
       <footer className={`text-center py-6 text-xs ${config.theme === 'dark' ? 'text-zinc-600' : 'text-slate-400'}`}>
-        OSASS - Copyright 2026
+        OSASS version 1.0.0 beta - Copyright 2026 
       </footer>
     </div>
   );
