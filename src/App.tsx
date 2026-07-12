@@ -973,11 +973,12 @@ export default function App() {
           config={config}
         />
 
-        {/* Footer */}
-        <footer className={`text-center py-6 text-xs ${config.theme === 'dark' ? 'text-zinc-600' : 'text-slate-400'}`}>
-          Copyright 2026
-        </footer>
       </div>
+      
+      {/* Footer */}
+      <footer className={`text-center py-6 text-xs ${config.theme === 'dark' ? 'text-zinc-600' : 'text-slate-400'}`}>
+        OSASS - Copyright 2026
+      </footer>
     </div>
   );
 }
