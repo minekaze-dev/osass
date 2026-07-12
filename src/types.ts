@@ -42,7 +42,7 @@ export interface HistoryEntry {
   notes: string;
 }
 
-export type CustomerStatus = 'Aktif' | 'Refund' | 'Follow Up' | 'Dismantle' | 'NBP' | 'Thinking' | 'Not Interested' | 'General Payment' | 'Paid';
+export type CustomerStatus = 'Aktif' | 'Refund' | 'Follow Up' | 'Dismantle' | 'NBP' | 'Thinking' | 'Not Interested' | 'General Payment' | 'Paid' | 'Area Full';
 
 export interface User {
   id: string;

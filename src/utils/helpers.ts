@@ -169,7 +169,8 @@ export const FOLLOW_UP_STATUSES = [
   'Installed',
   'Not Coverage',
   'Not Interested',
-  'Invalid Number'
+  'Invalid Number',
+  'Area Full'
 ] as const;
 
 // Format IDR currency
@@ -282,6 +283,7 @@ export const getStatusColorClasses = (status: FollowUpStatus) => {
     case 'Not Interested':
     case 'Not Coverage':
     case 'Invalid Number':
+    case 'Area Full':
       return { bg: 'bg-slate-100 text-slate-700 border-slate-200', text: 'text-slate-500' };
     case 'General Payment':
       return { bg: 'bg-blue-50 text-blue-700 border-blue-200', text: 'text-blue-600' };

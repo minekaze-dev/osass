@@ -45,7 +45,8 @@ const CUSTOMER_STATUSES: { value: CustomerStatus; label: string; color: string; 
   { value: 'Dismantle', label: 'Dismantle (Putus)', color: 'text-slate-700 border-slate-200 bg-slate-50', bg: 'bg-slate-600' },
   { value: 'NBP', label: 'NBP (tidak respon)', color: 'text-red-700 border-red-200 bg-red-50/50', bg: 'bg-red-500' },
   { value: 'Thinking', label: 'Thinking (Pikir-pikir/Diskusi)', color: 'text-indigo-700 border-indigo-200 bg-indigo-50', bg: 'bg-indigo-500' },
-  { value: 'Not Interested', label: 'Not Interested (Tidak minat)', color: 'text-slate-500 border-slate-200 bg-slate-100', bg: 'bg-slate-400' }
+  { value: 'Not Interested', label: 'Not Interested (Tidak minat)', color: 'text-slate-500 border-slate-200 bg-slate-100', bg: 'bg-slate-400' },
+  { value: 'Area Full', label: 'Area Full', color: 'text-slate-500 border-slate-200 bg-slate-100', bg: 'bg-slate-400' }
 ];
 
 export default function CustomerView({ 
@@ -259,6 +260,7 @@ export default function CustomerView({
               <option value="Thinking">Thinking</option>
               <option value="NBP">NBP</option>
               <option value="Not Interested">Not Interested</option>
+              <option value="Area Full">Area Full</option>
               <option value="none">Belum Ditentukan</option>
             </select>
           </div>
