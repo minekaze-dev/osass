@@ -109,7 +109,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, error, theme, onT
         </div>
 
         <p className={`mt-10 text-[8px] font-bold uppercase tracking-[0.2em] ${isDark ? 'text-zinc-800' : 'text-slate-200'}`}>
-          Secure Protocol &bull; PTS v2.5
+          Secure Protocol &bull; OSASS v1.0.0 beta
         </p>
       </motion.div>
     </div>

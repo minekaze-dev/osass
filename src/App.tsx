@@ -614,9 +614,9 @@ export default function App() {
             {/* Brand Logo */}
             <div className="mb-6 px-1">
               <img 
-                src={config.theme === 'dark' ? 'https://imgur.com/kg8i74Y.jpg' : 'https://imgur.com/Gek4pUr.jpg'} 
+                src={config.theme === 'dark' ? 'https://imgur.com/wcB0Js9.jpg' : 'https://imgur.com/kAmrpLM.jpg'} 
                 alt="Oxygen Logo" 
-                className="h-16 w-auto object-contain"
+                className="h-20 w-auto object-contain"
               />
             </div>
 
@@ -763,9 +763,9 @@ export default function App() {
           }`}>
             <div className="flex items-center gap-2 md:hidden">
               <img 
-                src={config.theme === 'dark' ? 'https://imgur.com/kg8i74Y.jpg' : 'https://imgur.com/Gek4pUr.jpg'} 
+                src={config.theme === 'dark' ? 'https://imgur.com/wcB0Js9.jpg' : 'https://imgur.com/kAmrpLM.jpg'} 
                 alt="Oxygen Logo" 
-                className="h-12 w-auto object-contain"
+                className="h-16 w-auto object-contain"
               />
             </div>
             
@@ -973,6 +973,10 @@ export default function App() {
           config={config}
         />
 
+        {/* Footer */}
+        <footer className={`text-center py-6 text-xs ${config.theme === 'dark' ? 'text-zinc-600' : 'text-slate-400'}`}>
+          Copyright 2026
+        </footer>
       </div>
     </div>
   );

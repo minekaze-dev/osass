@@ -388,6 +388,9 @@ export default function SettingsView({ config, onUpdateConfig, allLeads, onImpor
             Impor data akan menimpa seluruh daftar lead saat ini secara instan. Harap ekspor backup terlebih dahulu jika ragu.
           </p>
         </div>
+        <div className="text-[10px] text-slate-400 text-center pt-4">
+           v1.0.0 beta build for The Achiever
+        </div>
       </div>
 
     </div>

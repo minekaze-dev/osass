@@ -196,18 +196,13 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Welcome Banner */}
       <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-2xl border shadow-xs ${
         config.theme === 'dark' ? 'bg-[#18181b] border-zinc-800 text-zinc-100' : 'bg-white border-slate-100 shadow-xs'
       }`}>
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[#F58220] uppercase tracking-wider">Asisten Sales WiFi Oxygen</span>
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span className={`text-[10px] font-medium ${config.theme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>Online: {userName}</span>
-            {/* Language Switcher Placeholder */}
-            <span className={`text-[10px] font-medium ${config.theme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>| ID | EN</span>
           </div>
           
           {/* Month Filter Dropdown */}
