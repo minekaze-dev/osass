@@ -1,0 +1,6 @@
+{
+  "name": "Sales WiFi Oxygen",
+  "description": "Progressive Web App (PWA) asisten sales modern untuk mengelola lead, prospek, follow up reminder, dan revenue WiFi Oxygen.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
