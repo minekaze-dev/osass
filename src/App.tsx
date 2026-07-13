@@ -76,6 +76,7 @@ export default function App() {
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
+  const [supabaseError, setSupabaseError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
   // State
@@ -142,9 +143,11 @@ export default function App() {
       const storedConfig = localStorage.getItem('oxygen_config');
       const storedUsers = localStorage.getItem('oxygen_users');
 
+      let currentLocalUsers: User[] = [DEFAULT_ADMIN];
       if (storedUsers) {
         try {
-          setUsers(JSON.parse(storedUsers));
+          currentLocalUsers = JSON.parse(storedUsers);
+          setUsers(currentLocalUsers);
         } catch (e) {}
       }
 
@@ -173,13 +176,19 @@ export default function App() {
       if (supabase) {
         try {
           setIsSyncing(true);
+          setSupabaseError(null);
           
           // Fetch Users
           const { data: dbUsers, error: usersErr } = await supabase
             .from('users')
             .select('*');
           
-          if (!usersErr && dbUsers) {
+          if (usersErr) {
+            console.error('Failed to fetch users from Supabase:', usersErr);
+            throw usersErr;
+          }
+          
+          if (dbUsers) {
             const mappedUsers: User[] = dbUsers.map(u => ({
               id: u.id,
               name: u.name,
@@ -188,12 +197,35 @@ export default function App() {
               createdAt: u.created_at || u.createdAt || new Date().toISOString()
             }));
             
-            setUsers(mappedUsers);
-            localStorage.setItem('oxygen_users', JSON.stringify(mappedUsers));
+            // Intelligent merge: Keep Supabase users, but also preserve and auto-sync any local users not in Supabase yet
+            const mergedUsers = [...mappedUsers];
+            
+            for (const localUser of currentLocalUsers) {
+              const exists = dbUsers.some(u => u.id === localUser.id || u.code === localUser.code);
+              if (!exists) {
+                mergedUsers.push(localUser);
+                // Auto sync this offline user to Supabase
+                try {
+                  await supabase.from('users').upsert({
+                    id: localUser.id,
+                    name: localUser.name,
+                    code: localUser.code,
+                    role: localUser.role,
+                    created_at: localUser.createdAt
+                  });
+                  console.log(`Auto-synced local user ${localUser.name} to Supabase`);
+                } catch (err) {
+                  console.error(`Failed to auto-sync local user ${localUser.name} to Supabase:`, err);
+                }
+              }
+            }
+            
+            setUsers(mergedUsers);
+            localStorage.setItem('oxygen_users', JSON.stringify(mergedUsers));
 
             // Strict verification of active session against Supabase users
             if (auth.isAuthenticated && auth.user) {
-              const stillExists = mappedUsers.find(u => u.id === auth.user?.id && u.code === auth.user?.code);
+              const stillExists = mergedUsers.find(u => u.id === auth.user?.id && u.code === auth.user?.code);
               if (!stillExists) {
                 console.warn("Active user session not found in Supabase. Logging out.");
                 setAuth({ user: null, isAuthenticated: false });
@@ -261,13 +293,22 @@ export default function App() {
           }
           
           if (usersErr || configErr || leadsErr) {
-            console.error('Supabase initialization encountered table or policy errors:', { usersErr, configErr, leadsErr });
+            const errMsgs: string[] = [];
+            if (usersErr) errMsgs.push(`Tabel users: ${usersErr.message}`);
+            if (configErr) errMsgs.push(`Tabel config: ${configErr.message}`);
+            if (leadsErr) errMsgs.push(`Tabel leads: ${leadsErr.message}`);
+            
+            const fullError = errMsgs.join(' | ');
+            console.error('Supabase initialization encountered table or policy errors:', fullError);
+            setSupabaseError(fullError);
             setIsSupabaseConnected(false);
           } else {
             setIsSupabaseConnected(true);
+            setSupabaseError(null);
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error('Supabase initialization failed, running in local/offline mode:', err);
+          setSupabaseError(err.message || String(err));
           setIsSupabaseConnected(false);
         } finally {
           setIsSyncing(false);
@@ -627,16 +668,22 @@ export default function App() {
     setUsers(updatedUsers);
     localStorage.setItem('oxygen_users', JSON.stringify(updatedUsers));
 
-    if (supabase && isSupabaseConnected) {
+    if (supabase) {
       try {
-        await supabase.from('users').upsert({
+        const { error } = await supabase.from('users').upsert({
           id: newUser.id,
           name: newUser.name,
           code: newUser.code,
           role: newUser.role,
           created_at: newUser.createdAt
         });
-      } catch (err) {
+        if (error) {
+          console.error('Error adding user to Supabase:', error);
+          alert('Gagal menyimpan user ke Supabase: ' + error.message + '\n\nPastikan Anda sudah menjalankan SQL Script di halaman Settings.');
+        } else {
+          console.log('Success adding user to Supabase');
+        }
+      } catch (err: any) {
         console.error('Error sync adding user to Supabase:', err);
       }
     }
@@ -648,9 +695,13 @@ export default function App() {
       setUsers(updatedUsers);
       localStorage.setItem('oxygen_users', JSON.stringify(updatedUsers));
 
-      if (supabase && isSupabaseConnected) {
+      if (supabase) {
         try {
-          await supabase.from('users').delete().eq('id', userId);
+          const { error } = await supabase.from('users').delete().eq('id', userId);
+          if (error) {
+            console.error('Error deleting user from Supabase:', error);
+            alert('Gagal menghapus user dari Supabase: ' + error.message);
+          }
         } catch (err) {
           console.error('Error sync deleting user from Supabase:', err);
         }
@@ -663,17 +714,21 @@ export default function App() {
     setUsers(updatedUsers);
     localStorage.setItem('oxygen_users', JSON.stringify(updatedUsers));
 
-    if (supabase && isSupabaseConnected) {
+    if (supabase) {
       try {
         const u = updatedUsers.find(user => user.id === userId);
         if (u) {
-          await supabase.from('users').upsert({
+          const { error } = await supabase.from('users').upsert({
             id: u.id,
             name: u.name,
             code: u.code,
             role: u.role,
             created_at: u.createdAt
           });
+          if (error) {
+            console.error('Error updating user on Supabase:', error);
+            alert('Gagal memperbarui user di Supabase: ' + error.message);
+          }
         }
       } catch (err) {
         console.error('Error sync updating user on Supabase:', err);
