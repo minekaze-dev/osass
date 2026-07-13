@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { Lead, SalesConfig, FollowUpStatus, PipelineStage, HistoryEntry, CustomerStatus, User, AuthState } from './types';
 import { INITIAL_SALES_CONFIG } from './mockData';
-import { supabase } from './lib/supabase';
+import { supabase, updateSupabaseCredentials } from './lib/supabase';
 
 // Views
 import DashboardView from './components/DashboardView';
@@ -78,6 +78,23 @@ export default function App() {
   const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
   const [supabaseError, setSupabaseError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  const [dbUrl, setDbUrl] = useState(() => localStorage.getItem('oxygen_supabase_url') || '');
+  const [dbKey, setDbKey] = useState(() => localStorage.getItem('oxygen_supabase_anon_key') || '');
+
+  const handleUpdateSupabaseCredentials = (url: string, key: string) => {
+    updateSupabaseCredentials(url, key);
+    setDbUrl(url);
+    setDbKey(key);
+    
+    if (url && key) {
+      window.location.reload();
+    } else {
+      setIsSupabaseConnected(false);
+      setSupabaseError(null);
+      window.location.reload();
+    }
+  };
 
   // State
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -575,11 +592,15 @@ export default function App() {
   };
 
   // Auth Handlers
-  const handleLogin = async (code: string) => {
+  const handleLogin = async (rawCode: string) => {
+    const code = rawCode.trim();
     setIsLoggingIn(true);
     setLoginError('');
+    console.log('Oxygen Auth: Memulai verifikasi login untuk kode:', code);
+    
     try {
       if (supabase) {
+        console.log('Oxygen Auth: Melakukan query live ke Supabase untuk tabel "users"...');
         // Double check against database live
         const { data, error } = await supabase
           .from('users')
@@ -587,14 +608,17 @@ export default function App() {
           .eq('code', code)
           .maybeSingle();
 
+        console.log('Oxygen Auth: Hasil query Supabase:', { data, error });
+
         if (error) {
-          console.error('Supabase query error during login:', error);
+          console.error('Oxygen Auth: Error query Supabase saat login:', error);
           setLoginError(`Koneksi Supabase gagal: ${error.message} (Kode: ${error.code || 'UNKNOWN'}). Pastikan tabel 'users' sudah dibuat dan RLS sudah diizinkan.`);
           setIsLoggingIn(false);
           return;
         }
 
         if (data) {
+          console.log('Oxygen Auth: User berhasil ditemukan di Supabase:', data);
           const user: User = {
             id: data.id,
             name: data.name,
@@ -623,27 +647,31 @@ export default function App() {
           setIsLoggingIn(false);
           return;
         } else {
+          console.warn('Oxygen Auth: Kode tidak cocok dengan baris data manapun di tabel "users" Supabase. Ini bisa disebabkan karena data benar-benar tidak ada atau kebijakan RLS SELECT memblokir akses.');
           // If Supabase is active and the user is NOT found in Supabase table, reject login immediately
-          setLoginError('Kode akses tidak terdaftar di database Supabase. Pastikan tabel users sudah terisi.');
+          setLoginError('Kode akses tidak terdaftar di database Supabase ATAU kebijakan RLS SELECT memblokir pembacaan tabel users. Pastikan Anda telah menjalankan script SQL RLS di Supabase.');
           setIsLoggingIn(false);
           return;
         }
       }
     } catch (err: any) {
-      console.error('Supabase verification failed with exception:', err);
+      console.error('Oxygen Auth: Verifikasi Supabase gagal dengan exception:', err);
       setLoginError(`Gagal melakukan verifikasi: ${err.message || err}`);
       setIsLoggingIn(false);
       return;
     }
 
     // Fallback/Local login (Only executes if Supabase client is not initialized/active)
+    console.log('Oxygen Auth: Supabase tidak aktif. Menggunakan verifikasi database lokal/offline...');
     const user = users.find(u => u.code === code);
     if (user) {
+      console.log('Oxygen Auth: Berhasil login lokal:', user);
       setAuth({ user, isAuthenticated: true });
       localStorage.setItem('oxygen_auth', JSON.stringify({ user, isAuthenticated: true }));
       setLoginError('');
       setActiveTab('dashboard');
     } else {
+      console.warn('Oxygen Auth: Gagal login lokal. Kode tidak terdaftar di browser local storage.');
       if (supabase) {
         setLoginError('Kode akses tidak valid di Supabase. Pastikan data user ada di tabel dan kebijakan RLS SELECT sudah aktif.');
       } else {
@@ -1091,6 +1119,9 @@ export default function App() {
             isSyncing={isSyncing}
             onSyncToSupabase={handleSyncLocalToSupabase}
             onFetchFromSupabase={handleFetchFromSupabase}
+            supabaseUrl={dbUrl}
+            supabaseAnonKey={dbKey}
+            onUpdateSupabaseCredentials={handleUpdateSupabaseCredentials}
           />
         );
       default:
@@ -1106,6 +1137,10 @@ export default function App() {
         theme={config.theme}
         onToggleTheme={() => handleUpdateConfig({ ...config, theme: config.theme === 'light' ? 'dark' : 'light' })}
         isLoading={isLoggingIn}
+        onUpdateSupabaseCredentials={handleUpdateSupabaseCredentials}
+        isSupabaseConnected={isSupabaseConnected}
+        supabaseUrl={dbUrl}
+        supabaseAnonKey={dbKey}
       />
     );
   }

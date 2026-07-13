@@ -21,6 +21,9 @@ interface SettingsViewProps {
   isSyncing?: boolean;
   onSyncToSupabase?: () => void;
   onFetchFromSupabase?: () => void;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
+  onUpdateSupabaseCredentials?: (url: string, key: string) => void;
 }
 
 export default function SettingsView({ 
@@ -31,7 +34,10 @@ export default function SettingsView({
   isSupabaseConnected = false,
   isSyncing = false,
   onSyncToSupabase,
-  onFetchFromSupabase
+  onFetchFromSupabase,
+  supabaseUrl = '',
+  supabaseAnonKey = '',
+  onUpdateSupabaseCredentials = () => {}
 }: SettingsViewProps) {
   const [monthlyTarget, setMonthlyTarget] = useState(config.monthlyTarget);
   const [reminderMode, setReminderMode] = useState<'auto' | 'manual'>(config.reminderMode || 'auto');
@@ -39,6 +45,9 @@ export default function SettingsView({
   const [reminderNBPDays, setReminderNBPDays] = useState(config.reminderNBPDays);
   const [reminderPattern, setReminderPattern] = useState(config.reminderPattern || '1,2,4,7');
   const [theme, setTheme] = useState<'light' | 'dark'>(config.theme || 'light');
+  
+  const [dbUrl, setDbUrl] = useState(supabaseUrl);
+  const [dbKey, setDbKey] = useState(supabaseAnonKey);
   
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
@@ -434,8 +443,60 @@ export default function SettingsView({
             <p className="text-[10px] text-slate-500 mt-0.5">
               {isSupabaseConnected 
                 ? 'Seluruh penambahan dan perubahan data akan disimpan langsung ke database cloud.' 
-                : 'Menyimpan ke memori browser lokal. Dapatkan credentials Supabase dan letakkan di .env untuk mengaktifkan database online.'}
+                : 'Menyimpan ke memori browser lokal. Hubungkan ke Supabase dengan memasukkan detail credentials di bawah ini.'}
             </p>
+          </div>
+        </div>
+
+        {/* Credentials Form */}
+        <div className="p-4 bg-slate-50 rounded-xl space-y-3 border border-slate-100">
+          <h4 className="text-[10px] font-black uppercase text-slate-500 tracking-wider">Kredensial Koneksi Supabase</h4>
+          
+          <div>
+            <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Supabase URL</label>
+            <input
+              type="text"
+              placeholder="https://xxxxxx.supabase.co"
+              value={dbUrl}
+              onChange={(e) => setDbUrl(e.target.value)}
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#F58220]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Supabase Anon Key</label>
+            <input
+              type="password"
+              placeholder="eyJhbGciOiJIUzI1NiIsIn..."
+              value={dbKey}
+              onChange={(e) => setDbKey(e.target.value)}
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#F58220]"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => onUpdateSupabaseCredentials(dbUrl.trim(), dbKey.trim())}
+              disabled={isSyncing}
+              className="flex-1 py-2 px-3 bg-[#F58220] hover:bg-[#E07210] disabled:opacity-50 text-white font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all text-center cursor-pointer"
+            >
+              Simpan & Hubungkan
+            </button>
+            {(localStorage.getItem('oxygen_supabase_url') || localStorage.getItem('oxygen_supabase_anon_key')) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDbUrl('');
+                  setDbKey('');
+                  onUpdateSupabaseCredentials('', '');
+                }}
+                disabled={isSyncing}
+                className="py-2 px-3 bg-red-100 hover:bg-red-200 text-red-600 disabled:opacity-50 font-bold text-[10px] uppercase tracking-wider rounded-lg transition-all text-center cursor-pointer"
+              >
+                Putuskan
+              </button>
+            )}
           </div>
         </div>
 
