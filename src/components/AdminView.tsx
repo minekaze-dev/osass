@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { UserPlus, Trash2, Key, Users, ArrowLeft, ShieldCheck, Edit2, Check, X } from 'lucide-react';
+import { UserPlus, Trash2, Key, Users, ArrowLeft, ShieldCheck, Edit2, Check, X, AlertTriangle, Database, Copy, CheckSquare } from 'lucide-react';
 import { User } from '../types';
 import { DeleteUserModal } from './DeleteUserModal';
 
@@ -15,15 +15,130 @@ interface AdminViewProps {
   onDeleteUser: (userId: string) => void;
   onUpdateUser: (userId: string, updates: Partial<User>) => void;
   onBack: () => void;
+  isSupabaseConnected?: boolean;
+  supabaseError?: string | null;
 }
 
-export const AdminView: React.FC<AdminViewProps> = ({ users, onAddUser, onDeleteUser, onUpdateUser }) => {
+export const AdminView: React.FC<AdminViewProps> = ({ 
+  users, 
+  onAddUser, 
+  onDeleteUser, 
+  onUpdateUser,
+  isSupabaseConnected = false,
+  supabaseError = null
+}) => {
   const [newName, setNewName] = useState('');
   const [newCode, setNewCode] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editCode, setEditCode] = useState('');
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [showSqlSetup, setShowSqlSetup] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const sqlScript = `-- 1. Create Users Table
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  code TEXT UNIQUE,
+  role TEXT,
+  created_at TEXT
+);
+
+-- 2. Create Config Table
+CREATE TABLE IF NOT EXISTS config (
+  id TEXT PRIMARY KEY,
+  "salesName" TEXT,
+  "monthlyTarget" INTEGER,
+  "reminderMode" TEXT,
+  "reminderThinkingDays" INTEGER,
+  "reminderNBPDays" INTEGER,
+  theme TEXT,
+  "reminderPattern" TEXT
+);
+
+-- 3. Create Leads Table
+CREATE TABLE IF NOT EXISTS leads (
+  id TEXT PRIMARY KEY,
+  "userId" TEXT REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT,
+  whatsapp TEXT,
+  address TEXT,
+  area TEXT,
+  source TEXT,
+  "packageInterest" TEXT,
+  notes TEXT,
+  pipeline TEXT,
+  status TEXT,
+  "nextReminderDate" TEXT,
+  "lastFollowUpDate" TEXT,
+  "followUpCount" INTEGER DEFAULT 0,
+  "customerStatus" TEXT,
+  "closingDate" TEXT,
+  "subscriptionPeriod" TEXT,
+  "customerId" TEXT,
+  "closingStatus" TEXT,
+  history JSONB DEFAULT '[]'::jsonb,
+  "createdAt" TEXT
+);
+
+-- 4. Enable Row Level Security (RLS)
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+
+-- 5. Create RLS Policies for Public Access (Using Anon Key)
+-- Users Policies
+DROP POLICY IF EXISTS "Public Select Users" ON users;
+CREATE POLICY "Public Select Users" ON users FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public Insert Users" ON users;
+CREATE POLICY "Public Insert Users" ON users FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public Update Users" ON users;
+CREATE POLICY "Public Update Users" ON users FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Public Delete Users" ON users;
+CREATE POLICY "Public Delete Users" ON users FOR DELETE USING (true);
+
+-- Config Policies
+DROP POLICY IF EXISTS "Public Select Config" ON config;
+CREATE POLICY "Public Select Config" ON config FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public Insert Config" ON config;
+CREATE POLICY "Public Insert Config" ON config FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public Update Config" ON config;
+CREATE POLICY "Public Update Config" ON config FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Public Delete Config" ON config;
+CREATE POLICY "Public Delete Config" ON config FOR DELETE USING (true);
+
+-- Leads Policies
+DROP POLICY IF EXISTS "Public Select Leads" ON leads;
+CREATE POLICY "Public Select Leads" ON leads FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public Insert Leads" ON leads;
+CREATE POLICY "Public Insert Leads" ON leads FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public Update Leads" ON leads;
+CREATE POLICY "Public Update Leads" ON leads FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Public Delete Leads" ON leads;
+CREATE POLICY "Public Delete Leads" ON leads FOR DELETE USING (true);
+
+-- 6. Insert Default Admin & Sales Assistant Users
+INSERT INTO users (id, name, code, role, created_at)
+VALUES 
+  ('admin-001', 'Super Admin', '1admosass', 'admin', NOW()::text),
+  ('sales-001', 'Sales Assistant', '123456', 'user', NOW()::text)
+ON CONFLICT (id) DO NOTHING;`;
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(sqlScript);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,13 +183,84 @@ export const AdminView: React.FC<AdminViewProps> = ({ users, onAddUser, onDelete
           }}
         />
       )}
-      <header className="mb-10">
-        <h1 className="text-xl font-black tracking-tight flex items-center gap-3">
-          <ShieldCheck className="w-6 h-6 text-orange-500" />
-          Personnel Management
-        </h1>
-        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Oxygen WiFi Internal Access Control</p>
+      <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-black tracking-tight flex items-center gap-3">
+            <ShieldCheck className="w-6 h-6 text-orange-500" />
+            Personnel Management
+          </h1>
+          <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-1">Oxygen WiFi Internal Access Control</p>
+        </div>
+        
+        {/* Connection Status Indicator for Admin */}
+        <div className={`self-start md:self-auto border px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 ${
+          isSupabaseConnected 
+            ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' 
+            : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+        }`}>
+          <Database className={`w-4 h-4 ${isSupabaseConnected ? 'text-cyan-400 animate-pulse' : 'text-amber-500'}`} />
+          <span>Status Database: {isSupabaseConnected ? 'Terhubung (Supabase)' : 'Lokal (Offline)'}</span>
+        </div>
       </header>
+
+      {/* Supabase Error & SQL Script Assistant Banner */}
+      {!isSupabaseConnected && (
+        <div className="mb-8 p-5 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+          <div className="flex gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xs font-black uppercase tracking-wider text-amber-500">Database Belum Terhubung Sempurna</h3>
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                Supabase terdeteksi, namun beberapa tabel atau kebijakan keamanan (RLS) di Supabase belum dikonfigurasi dengan benar.
+                Ini menyebabkan data user yang Anda daftarkan mungkin hanya tersimpan di browser lokal dan tidak tersinkron ke database online Supabase.
+              </p>
+              {supabaseError && (
+                <div className="mt-3 p-3 bg-black/40 border border-amber-500/10 rounded-xl font-mono text-[10px] text-amber-400 overflow-x-auto">
+                  Error Detail: {supabaseError}
+                </div>
+              )}
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => setShowSqlSetup(!showSqlSetup)}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black text-xs font-black uppercase tracking-wider rounded-xl transition-all"
+                >
+                  {showSqlSetup ? 'Sembunyikan SQL Script' : 'Lihat / Salin SQL Script Setup'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {showSqlSetup && (
+            <div className="mt-4 p-4 bg-zinc-950 border border-zinc-800 rounded-xl">
+              <div className="flex justify-between items-center pb-2.5 mb-2.5 border-b border-zinc-800">
+                <span className="text-[10px] font-bold uppercase text-zinc-500">SQL QUERY EDITOR FOR SUPABASE</span>
+                <button
+                  onClick={copyToClipboard}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-lg text-[10px] font-bold transition-all"
+                >
+                  {copied ? (
+                    <>
+                      <CheckSquare className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>Tersalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Salin Query SQL</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-[10px] text-zinc-400 mb-3 leading-relaxed">
+                Buka tab <strong className="text-orange-500">SQL Editor</strong> di dashboard Supabase Anda, buat query baru, paste query di bawah ini, lalu jalankan (klik <strong className="text-orange-500">Run</strong>).
+              </p>
+              <pre className="p-3 bg-black/50 rounded-lg text-[9px] font-mono text-zinc-300 overflow-x-auto max-h-[300px] scrollbar-thin whitespace-pre">
+                {sqlScript}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
         {/* Add User Form */}

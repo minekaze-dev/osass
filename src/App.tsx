@@ -206,14 +206,18 @@ export default function App() {
                 mergedUsers.push(localUser);
                 // Auto sync this offline user to Supabase
                 try {
-                  await supabase.from('users').upsert({
+                  const { error: syncErr } = await supabase.from('users').upsert({
                     id: localUser.id,
                     name: localUser.name,
                     code: localUser.code,
                     role: localUser.role,
                     created_at: localUser.createdAt
                   });
-                  console.log(`Auto-synced local user ${localUser.name} to Supabase`);
+                  if (syncErr) {
+                    console.error(`Failed to auto-sync local user ${localUser.name} to Supabase:`, syncErr.message);
+                  } else {
+                    console.log(`Auto-synced local user ${localUser.name} to Supabase`);
+                  }
                 } catch (err) {
                   console.error(`Failed to auto-sync local user ${localUser.name} to Supabase:`, err);
                 }
@@ -1001,7 +1005,7 @@ export default function App() {
     }
 
     // Admin Specific Dashboard
-    if (auth.user?.role === 'admin') {
+    if (auth.user?.role === 'admin' && activeTab !== 'settings') {
       return (
         <AdminView 
           users={users} 
@@ -1009,6 +1013,8 @@ export default function App() {
           onDeleteUser={handleDeleteUser} 
           onUpdateUser={handleUpdateUser}
           onBack={() => {}} // No back button for admin as this is their only view
+          isSupabaseConnected={isSupabaseConnected}
+          supabaseError={supabaseError}
         />
       );
     }
@@ -1229,12 +1235,31 @@ export default function App() {
                   </button>
                 </>
               ) : (
-                <button
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold bg-zinc-800 text-[#F58220] shadow-2xs cursor-default`}
-                >
-                  <ShieldCheck className="w-4 h-4 shrink-0" />
-                  <span>User Management</span>
-                </button>
+                <>
+                  <button
+                    onClick={() => setActiveTab('admin')}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                      activeTab === 'admin' 
+                        ? config.theme === 'dark' ? 'bg-zinc-800 text-[#F58220]' : 'bg-orange-50 text-[#F58220]' 
+                        : config.theme === 'dark' ? 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    }`}
+                  >
+                    <ShieldCheck className="w-4 h-4 shrink-0" />
+                    <span>User Management</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('settings')}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                      activeTab === 'settings' 
+                        ? config.theme === 'dark' ? 'bg-zinc-800 text-[#F58220]' : 'bg-orange-50 text-[#F58220]' 
+                        : config.theme === 'dark' ? 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    }`}
+                  >
+                    <Settings className="w-4 h-4 shrink-0" />
+                    <span>Settings</span>
+                  </button>
+                </>
               )}
             </nav>
           </div>
@@ -1327,7 +1352,39 @@ export default function App() {
         </div>
 
         {/* ================= MOBILE BOTTOM NAVIGATION ================= */}
-        {!isAdmin && (
+        {isAdmin ? (
+          <nav className={`fixed bottom-0 left-0 right-0 px-2 py-1.5 z-40 flex justify-around md:hidden shadow-lg rounded-t-xl border-t transition-colors duration-200 ${
+            config.theme === 'dark' ? 'bg-[#18181b] border-zinc-800' : 'bg-white border-slate-200'
+          }`}>
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`flex flex-col items-center justify-center w-24 py-1 rounded-lg transition-colors ${
+                activeTab === 'admin' ? 'text-[#F58220]' : config.theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-slate-400'
+              }`}
+            >
+              <ShieldCheck className="w-5 h-5" />
+              <span className="text-[8px] font-bold mt-1">Users</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`flex flex-col items-center justify-center w-24 py-1 rounded-lg transition-colors ${
+                activeTab === 'settings' ? 'text-[#F58220]' : config.theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-slate-400'
+              }`}
+            >
+              <Settings className="w-5 h-5" />
+              <span className="text-[8px] font-bold mt-1">Settings</span>
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className={`flex flex-col items-center justify-center w-24 py-1 rounded-lg transition-colors text-red-400`}
+            >
+              <LogOut className="w-5 h-5" />
+              <span className="text-[8px] font-bold mt-1">Out</span>
+            </button>
+          </nav>
+        ) : (
           <nav className={`fixed bottom-0 left-0 right-0 px-2 py-1.5 z-40 flex justify-around md:hidden shadow-lg rounded-t-xl border-t transition-colors duration-200 ${
             config.theme === 'dark' ? 'bg-[#18181b] border-zinc-800' : 'bg-white border-slate-200'
           }`}>
