@@ -188,11 +188,21 @@ export default function App() {
               createdAt: u.created_at || u.createdAt || new Date().toISOString()
             }));
             
-            if (!mappedUsers.some(u => u.id === 'admin-001')) {
-              mappedUsers.push(DEFAULT_ADMIN);
-            }
             setUsers(mappedUsers);
             localStorage.setItem('oxygen_users', JSON.stringify(mappedUsers));
+
+            // Strict verification of active session against Supabase users
+            if (auth.isAuthenticated && auth.user) {
+              const stillExists = mappedUsers.find(u => u.id === auth.user?.id && u.code === auth.user?.code);
+              if (!stillExists) {
+                console.warn("Active user session not found in Supabase. Logging out.");
+                setAuth({ user: null, isAuthenticated: false });
+                localStorage.removeItem('oxygen_auth');
+              } else {
+                setAuth({ user: stillExists, isAuthenticated: true });
+                localStorage.setItem('oxygen_auth', JSON.stringify({ user: stillExists, isAuthenticated: true }));
+              }
+            }
           }
 
           // Fetch Config
@@ -250,7 +260,12 @@ export default function App() {
             localStorage.setItem('oxygen_leads', JSON.stringify(mappedLeads));
           }
           
-          setIsSupabaseConnected(true);
+          if (usersErr || configErr || leadsErr) {
+            console.error('Supabase initialization encountered table or policy errors:', { usersErr, configErr, leadsErr });
+            setIsSupabaseConnected(false);
+          } else {
+            setIsSupabaseConnected(true);
+          }
         } catch (err) {
           console.error('Supabase initialization failed, running in local/offline mode:', err);
           setIsSupabaseConnected(false);
@@ -527,7 +542,14 @@ export default function App() {
           .eq('code', code)
           .maybeSingle();
 
-        if (!error && data) {
+        if (error) {
+          console.error('Supabase query error during login:', error);
+          setLoginError(`Koneksi Supabase gagal: ${error.message} (Kode: ${error.code || 'UNKNOWN'}). Pastikan tabel 'users' sudah dibuat dan RLS sudah diizinkan.`);
+          setIsLoggingIn(false);
+          return;
+        }
+
+        if (data) {
           const user: User = {
             id: data.id,
             name: data.name,
@@ -555,34 +577,21 @@ export default function App() {
           setActiveTab('dashboard');
           setIsLoggingIn(false);
           return;
-        } else if (code === DEFAULT_ADMIN.code) {
-          // If code is the default super admin, let them login and sync them to Supabase
-          const user = DEFAULT_ADMIN;
-          try {
-            await supabase.from('users').upsert({
-              id: user.id,
-              name: user.name,
-              code: user.code,
-              role: user.role,
-              created_at: user.createdAt
-            });
-          } catch (e) {
-            console.error('Failed to sync DEFAULT_ADMIN to Supabase:', e);
-          }
-          
-          setAuth({ user, isAuthenticated: true });
-          localStorage.setItem('oxygen_auth', JSON.stringify({ user, isAuthenticated: true }));
-          setLoginError('');
-          setActiveTab('dashboard');
+        } else {
+          // If Supabase is active and the user is NOT found in Supabase table, reject login immediately
+          setLoginError('Kode akses tidak terdaftar di database Supabase. Pastikan tabel users sudah terisi.');
           setIsLoggingIn(false);
           return;
         }
       }
-    } catch (err) {
-      console.error('Supabase verification failed, falling back to local users:', err);
+    } catch (err: any) {
+      console.error('Supabase verification failed with exception:', err);
+      setLoginError(`Gagal melakukan verifikasi: ${err.message || err}`);
+      setIsLoggingIn(false);
+      return;
     }
 
-    // Fallback/Local login
+    // Fallback/Local login (Only executes if Supabase client is not initialized/active)
     const user = users.find(u => u.code === code);
     if (user) {
       setAuth({ user, isAuthenticated: true });
@@ -590,7 +599,11 @@ export default function App() {
       setLoginError('');
       setActiveTab('dashboard');
     } else {
-      setLoginError('Kode akses tidak valid');
+      if (supabase) {
+        setLoginError('Kode akses tidak valid di Supabase. Pastikan data user ada di tabel dan kebijakan RLS SELECT sudah aktif.');
+      } else {
+        setLoginError('Kode akses tidak valid');
+      }
     }
     setIsLoggingIn(false);
   };
