@@ -23,7 +23,8 @@ export type FollowUpStatus =
   | 'Installed'
   | 'Not Coverage'
   | 'Not Interested'
-  | 'Invalid Number';
+  | 'Invalid Number'
+  | 'Area Full';
 
 export type PipelineStage =
   | 'Lead Baru'

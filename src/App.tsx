@@ -74,6 +74,9 @@ export default function App() {
   });
   
   const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // State
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -131,33 +134,133 @@ export default function App() {
     }
   }, [activeTab, dueLeadsCount]);
 
-  // Initialize data from localStorage or mockData
+  // Initialize data from localStorage or mockData and Sync with Supabase
   useEffect(() => {
-    const storedLeads = localStorage.getItem('oxygen_leads');
-    const storedConfig = localStorage.getItem('oxygen_config');
+    const loadInitialData = async () => {
+      // 1. Immediate Offline-first Load
+      const storedLeads = localStorage.getItem('oxygen_leads');
+      const storedConfig = localStorage.getItem('oxygen_config');
+      const storedUsers = localStorage.getItem('oxygen_users');
 
-    if (storedLeads) {
-      try {
-        const parsed = JSON.parse(storedLeads) as Lead[];
-        const formatted = parsed.map(l => ({ ...l, name: (l.name || 'TANPA NAMA').toUpperCase() }));
-        setLeads(formatted);
-      } catch (e) {
-        setLeads([]);
+      if (storedUsers) {
+        try {
+          setUsers(JSON.parse(storedUsers));
+        } catch (e) {}
       }
-    } else {
-      setLeads([]);
-    }
 
-    if (storedConfig) {
-      try {
-        setConfig(JSON.parse(storedConfig));
-      } catch (e) {
+      if (storedLeads) {
+        try {
+          const parsed = JSON.parse(storedLeads) as Lead[];
+          const formatted = parsed.map(l => ({ ...l, name: (l.name || 'TANPA NAMA').toUpperCase() }));
+          setLeads(formatted);
+        } catch (e) {
+          setLeads([]);
+        }
+      }
+
+      if (storedConfig) {
+        try {
+          setConfig(JSON.parse(storedConfig));
+        } catch (e) {
+          setConfig(INITIAL_SALES_CONFIG);
+        }
+      } else {
         setConfig(INITIAL_SALES_CONFIG);
+        localStorage.setItem('oxygen_config', JSON.stringify(INITIAL_SALES_CONFIG));
       }
-    } else {
-      setConfig(INITIAL_SALES_CONFIG);
-      localStorage.setItem('oxygen_config', JSON.stringify(INITIAL_SALES_CONFIG));
-    }
+
+      // 2. Async Online-sync Load if Supabase is active
+      if (supabase) {
+        try {
+          setIsSyncing(true);
+          
+          // Fetch Users
+          const { data: dbUsers, error: usersErr } = await supabase
+            .from('users')
+            .select('*');
+          
+          if (!usersErr && dbUsers) {
+            const mappedUsers: User[] = dbUsers.map(u => ({
+              id: u.id,
+              name: u.name,
+              code: u.code,
+              role: u.role,
+              createdAt: u.created_at || u.createdAt || new Date().toISOString()
+            }));
+            
+            if (!mappedUsers.some(u => u.id === 'admin-001')) {
+              mappedUsers.push(DEFAULT_ADMIN);
+            }
+            setUsers(mappedUsers);
+            localStorage.setItem('oxygen_users', JSON.stringify(mappedUsers));
+          }
+
+          // Fetch Config
+          const { data: dbConfig, error: configErr } = await supabase
+            .from('config')
+            .select('*')
+            .eq('id', 'global_config')
+            .maybeSingle();
+
+          if (!configErr && dbConfig) {
+            const parsedConfig: SalesConfig = {
+              salesName: dbConfig.salesName || INITIAL_SALES_CONFIG.salesName,
+              monthlyTarget: Number(dbConfig.monthlyTarget) || INITIAL_SALES_CONFIG.monthlyTarget,
+              reminderMode: dbConfig.reminderMode || INITIAL_SALES_CONFIG.reminderMode,
+              reminderThinkingDays: Number(dbConfig.reminderThinkingDays) || INITIAL_SALES_CONFIG.reminderThinkingDays,
+              reminderNBPDays: Number(dbConfig.reminderNBPDays) || INITIAL_SALES_CONFIG.reminderNBPDays,
+              theme: dbConfig.theme || INITIAL_SALES_CONFIG.theme,
+              reminderPattern: dbConfig.reminderPattern || INITIAL_SALES_CONFIG.reminderPattern,
+            };
+            setConfig(parsedConfig);
+            localStorage.setItem('oxygen_config', JSON.stringify(parsedConfig));
+          }
+
+          // Fetch Leads
+          const { data: dbLeads, error: leadsErr } = await supabase
+            .from('leads')
+            .select('*');
+
+          if (!leadsErr && dbLeads) {
+            const mappedLeads: Lead[] = dbLeads.map(l => ({
+              id: l.id,
+              userId: l.userId,
+              name: l.name,
+              whatsapp: l.whatsapp,
+              address: l.address,
+              area: l.area,
+              source: l.source,
+              packageInterest: l.packageInterest,
+              notes: l.notes,
+              pipeline: l.pipeline,
+              status: l.status,
+              nextReminderDate: l.nextReminderDate,
+              lastFollowUpDate: l.lastFollowUpDate,
+              followUpCount: Number(l.followUpCount) || 0,
+              customerStatus: l.customerStatus,
+              closingDate: l.closingDate,
+              subscriptionPeriod: l.subscriptionPeriod,
+              customerId: l.customerId,
+              closingStatus: l.closingStatus,
+              history: Array.isArray(l.history) ? l.history : [],
+              createdAt: l.createdAt
+            }));
+
+            setLeads(mappedLeads);
+            localStorage.setItem('oxygen_leads', JSON.stringify(mappedLeads));
+          }
+          
+          setIsSupabaseConnected(true);
+        } catch (err) {
+          console.error('Supabase initialization failed, running in local/offline mode:', err);
+          setIsSupabaseConnected(false);
+        } finally {
+          setIsSyncing(false);
+        }
+      }
+    };
+
+    loadInitialData();
   }, []);
 
   // Sync theme with document class list
@@ -169,8 +272,8 @@ export default function App() {
     }
   }, [config.theme]);
 
-  // Save Leads to LocalStorage whenever updated
-  const saveLeads = (updatedLeads: Lead[]) => {
+  // Save Leads to LocalStorage & Sync to Supabase background
+  const saveLeads = async (updatedLeads: Lead[]) => {
     const formatted = updatedLeads.map(l => ({
       ...l,
       name: (l.name && l.name.trim() !== '' && l.name !== 'TANPA NAMA' ? l.name : '-').toUpperCase(),
@@ -180,16 +283,306 @@ export default function App() {
     }));
     setLeads(formatted);
     localStorage.setItem('oxygen_leads', JSON.stringify(formatted));
+
+    if (supabase && isSupabaseConnected) {
+      try {
+        const dbLeads = formatted.map(l => ({
+          id: l.id,
+          userId: l.userId,
+          name: l.name,
+          whatsapp: l.whatsapp,
+          address: l.address,
+          area: l.area,
+          source: l.source,
+          packageInterest: l.packageInterest,
+          notes: l.notes,
+          pipeline: l.pipeline,
+          status: l.status,
+          nextReminderDate: l.nextReminderDate,
+          lastFollowUpDate: l.lastFollowUpDate,
+          followUpCount: l.followUpCount,
+          customerStatus: l.customerStatus,
+          closingDate: l.closingDate,
+          subscriptionPeriod: l.subscriptionPeriod,
+          customerId: l.customerId,
+          closingStatus: l.closingStatus,
+          history: l.history,
+          createdAt: l.createdAt
+        }));
+
+        await supabase.from('leads').upsert(dbLeads, { onConflict: 'id' });
+      } catch (err) {
+        console.error('Error auto-syncing leads to Supabase:', err);
+      }
+    }
   };
 
-  // Save Config to LocalStorage
-  const handleUpdateConfig = (newConfig: SalesConfig) => {
+  // Save Config to LocalStorage & Sync to Supabase
+  const handleUpdateConfig = async (newConfig: SalesConfig) => {
     setConfig(newConfig);
     localStorage.setItem('oxygen_config', JSON.stringify(newConfig));
+
+    if (supabase && isSupabaseConnected) {
+      try {
+        await supabase.from('config').upsert({
+          id: 'global_config',
+          salesName: newConfig.salesName,
+          monthlyTarget: newConfig.monthlyTarget,
+          reminderMode: newConfig.reminderMode,
+          reminderThinkingDays: newConfig.reminderThinkingDays,
+          reminderNBPDays: newConfig.reminderNBPDays,
+          theme: newConfig.theme,
+          reminderPattern: newConfig.reminderPattern,
+        }, { onConflict: 'id' });
+      } catch (err) {
+        console.error('Error auto-syncing config to Supabase:', err);
+      }
+    }
+  };
+
+  // Upload state to Supabase
+  const handleSyncLocalToSupabase = async () => {
+    if (!supabase) {
+      alert('Supabase belum dikonfigurasi di .env');
+      return;
+    }
+    try {
+      setIsSyncing(true);
+      
+      // 1. Sync Config
+      const { error: configErr } = await supabase
+        .from('config')
+        .upsert({
+          id: 'global_config',
+          salesName: config.salesName,
+          monthlyTarget: config.monthlyTarget,
+          reminderMode: config.reminderMode,
+          reminderThinkingDays: config.reminderThinkingDays,
+          reminderNBPDays: config.reminderNBPDays,
+          theme: config.theme,
+          reminderPattern: config.reminderPattern,
+        }, { onConflict: 'id' });
+      if (configErr) throw configErr;
+
+      // 2. Sync Users
+      const dbUsers = users.map(u => ({
+        id: u.id,
+        name: u.name,
+        code: u.code,
+        role: u.role,
+        created_at: u.createdAt
+      }));
+      const { error: usersErr } = await supabase
+        .from('users')
+        .upsert(dbUsers, { onConflict: 'id' });
+      if (usersErr) throw usersErr;
+
+      // 3. Sync Leads
+      if (leads.length > 0) {
+        const dbLeads = leads.map(l => ({
+          id: l.id,
+          userId: l.userId,
+          name: l.name,
+          whatsapp: l.whatsapp,
+          address: l.address,
+          area: l.area,
+          source: l.source,
+          packageInterest: l.packageInterest,
+          notes: l.notes,
+          pipeline: l.pipeline,
+          status: l.status,
+          nextReminderDate: l.nextReminderDate,
+          lastFollowUpDate: l.lastFollowUpDate,
+          followUpCount: l.followUpCount,
+          customerStatus: l.customerStatus,
+          closingDate: l.closingDate,
+          subscriptionPeriod: l.subscriptionPeriod,
+          customerId: l.customerId,
+          closingStatus: l.closingStatus,
+          history: l.history,
+          createdAt: l.createdAt
+        }));
+        
+        const { error: leadsErr } = await supabase
+          .from('leads')
+          .upsert(dbLeads, { onConflict: 'id' });
+        if (leadsErr) throw leadsErr;
+      }
+
+      setIsSupabaseConnected(true);
+      alert('Berhasil mengunggah semua data lokal ke database Supabase!');
+    } catch (err: any) {
+      console.error(err);
+      alert('Gagal sinkronisasi ke Supabase: ' + (err.message || err));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Fetch state from Supabase
+  const handleFetchFromSupabase = async () => {
+    if (!supabase) {
+      alert('Supabase belum dikonfigurasi di .env');
+      return;
+    }
+    try {
+      setIsSyncing(true);
+      
+      // 1. Fetch Users
+      const { data: dbUsers, error: usersErr } = await supabase
+        .from('users')
+        .select('*');
+      if (usersErr) throw usersErr;
+      
+      if (dbUsers) {
+        const mappedUsers: User[] = dbUsers.map(u => ({
+          id: u.id,
+          name: u.name,
+          code: u.code,
+          role: u.role,
+          createdAt: u.created_at || u.createdAt || new Date().toISOString()
+        }));
+        if (!mappedUsers.some(u => u.id === 'admin-001')) {
+          mappedUsers.push(DEFAULT_ADMIN);
+        }
+        setUsers(mappedUsers);
+        localStorage.setItem('oxygen_users', JSON.stringify(mappedUsers));
+      }
+
+      // 2. Fetch Config
+      const { data: dbConfig, error: configErr } = await supabase
+        .from('config')
+        .select('*')
+        .eq('id', 'global_config')
+        .maybeSingle();
+      
+      if (!configErr && dbConfig) {
+        const parsedConfig: SalesConfig = {
+          salesName: dbConfig.salesName || INITIAL_SALES_CONFIG.salesName,
+          monthlyTarget: Number(dbConfig.monthlyTarget) || INITIAL_SALES_CONFIG.monthlyTarget,
+          reminderMode: dbConfig.reminderMode || INITIAL_SALES_CONFIG.reminderMode,
+          reminderThinkingDays: Number(dbConfig.reminderThinkingDays) || INITIAL_SALES_CONFIG.reminderThinkingDays,
+          reminderNBPDays: Number(dbConfig.reminderNBPDays) || INITIAL_SALES_CONFIG.reminderNBPDays,
+          theme: dbConfig.theme || INITIAL_SALES_CONFIG.theme,
+          reminderPattern: dbConfig.reminderPattern || INITIAL_SALES_CONFIG.reminderPattern,
+        };
+        setConfig(parsedConfig);
+        localStorage.setItem('oxygen_config', JSON.stringify(parsedConfig));
+      }
+
+      // 3. Fetch Leads
+      const { data: dbLeads, error: leadsErr } = await supabase
+        .from('leads')
+        .select('*');
+      if (leadsErr) throw leadsErr;
+
+      if (dbLeads) {
+        const mappedLeads: Lead[] = dbLeads.map(l => ({
+          id: l.id,
+          userId: l.userId,
+          name: l.name,
+          whatsapp: l.whatsapp,
+          address: l.address,
+          area: l.area,
+          source: l.source,
+          packageInterest: l.packageInterest,
+          notes: l.notes,
+          pipeline: l.pipeline,
+          status: l.status,
+          nextReminderDate: l.nextReminderDate,
+          lastFollowUpDate: l.lastFollowUpDate,
+          followUpCount: Number(l.followUpCount) || 0,
+          customerStatus: l.customerStatus,
+          closingDate: l.closingDate,
+          subscriptionPeriod: l.subscriptionPeriod,
+          customerId: l.customerId,
+          closingStatus: l.closingStatus,
+          history: Array.isArray(l.history) ? l.history : [],
+          createdAt: l.createdAt
+        }));
+        setLeads(mappedLeads);
+        localStorage.setItem('oxygen_leads', JSON.stringify(mappedLeads));
+      }
+
+      setIsSupabaseConnected(true);
+      alert('Berhasil mengunduh dan menyinkronkan data terbaru dari Supabase!');
+    } catch (err: any) {
+      console.error(err);
+      alert('Gagal mengambil data dari Supabase: ' + (err.message || err));
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   // Auth Handlers
-  const handleLogin = (code: string) => {
+  const handleLogin = async (code: string) => {
+    setIsLoggingIn(true);
+    setLoginError('');
+    try {
+      if (supabase) {
+        // Double check against database live
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('code', code)
+          .maybeSingle();
+
+        if (!error && data) {
+          const user: User = {
+            id: data.id,
+            name: data.name,
+            code: data.code,
+            role: data.role,
+            createdAt: data.created_at || data.createdAt || new Date().toISOString()
+          };
+          
+          // Update local users list if this user isn't in it or is different
+          setUsers(prevUsers => {
+            const existingUserIndex = prevUsers.findIndex(u => u.id === user.id);
+            let updatedUsers = [...prevUsers];
+            if (existingUserIndex !== -1) {
+              updatedUsers[existingUserIndex] = user;
+            } else {
+              updatedUsers.push(user);
+            }
+            localStorage.setItem('oxygen_users', JSON.stringify(updatedUsers));
+            return updatedUsers;
+          });
+
+          setAuth({ user, isAuthenticated: true });
+          localStorage.setItem('oxygen_auth', JSON.stringify({ user, isAuthenticated: true }));
+          setLoginError('');
+          setActiveTab('dashboard');
+          setIsLoggingIn(false);
+          return;
+        } else if (code === DEFAULT_ADMIN.code) {
+          // If code is the default super admin, let them login and sync them to Supabase
+          const user = DEFAULT_ADMIN;
+          try {
+            await supabase.from('users').upsert({
+              id: user.id,
+              name: user.name,
+              code: user.code,
+              role: user.role,
+              created_at: user.createdAt
+            });
+          } catch (e) {
+            console.error('Failed to sync DEFAULT_ADMIN to Supabase:', e);
+          }
+          
+          setAuth({ user, isAuthenticated: true });
+          localStorage.setItem('oxygen_auth', JSON.stringify({ user, isAuthenticated: true }));
+          setLoginError('');
+          setActiveTab('dashboard');
+          setIsLoggingIn(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Supabase verification failed, falling back to local users:', err);
+    }
+
+    // Fallback/Local login
     const user = users.find(u => u.code === code);
     if (user) {
       setAuth({ user, isAuthenticated: true });
@@ -199,6 +592,7 @@ export default function App() {
     } else {
       setLoginError('Kode akses tidak valid');
     }
+    setIsLoggingIn(false);
   };
 
   const handleLogout = () => {
@@ -208,7 +602,7 @@ export default function App() {
   };
 
   // Admin Handlers
-  const handleAddUser = (name: string, code: string) => {
+  const handleAddUser = async (name: string, code: string) => {
     const newUser: User = {
       id: `user-${Date.now()}`,
       name,
@@ -219,20 +613,59 @@ export default function App() {
     const updatedUsers = [...users, newUser];
     setUsers(updatedUsers);
     localStorage.setItem('oxygen_users', JSON.stringify(updatedUsers));
+
+    if (supabase && isSupabaseConnected) {
+      try {
+        await supabase.from('users').upsert({
+          id: newUser.id,
+          name: newUser.name,
+          code: newUser.code,
+          role: newUser.role,
+          created_at: newUser.createdAt
+        });
+      } catch (err) {
+        console.error('Error sync adding user to Supabase:', err);
+      }
+    }
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (window.confirm('Hapus user ini? Semua data terkait mungkin tidak terakses.')) {
       const updatedUsers = users.filter(u => u.id !== userId);
       setUsers(updatedUsers);
       localStorage.setItem('oxygen_users', JSON.stringify(updatedUsers));
+
+      if (supabase && isSupabaseConnected) {
+        try {
+          await supabase.from('users').delete().eq('id', userId);
+        } catch (err) {
+          console.error('Error sync deleting user from Supabase:', err);
+        }
+      }
     }
   };
 
-  const handleUpdateUser = (userId: string, updates: Partial<User>) => {
+  const handleUpdateUser = async (userId: string, updates: Partial<User>) => {
     const updatedUsers = users.map(u => u.id === userId ? { ...u, ...updates } : u);
     setUsers(updatedUsers);
     localStorage.setItem('oxygen_users', JSON.stringify(updatedUsers));
+
+    if (supabase && isSupabaseConnected) {
+      try {
+        const u = updatedUsers.find(user => user.id === userId);
+        if (u) {
+          await supabase.from('users').upsert({
+            id: u.id,
+            name: u.name,
+            code: u.code,
+            role: u.role,
+            created_at: u.createdAt
+          });
+        }
+      } catch (err) {
+        console.error('Error sync updating user on Supabase:', err);
+      }
+    }
   };
 
   // Handle Add Lead
@@ -580,6 +1013,10 @@ export default function App() {
             onUpdateConfig={handleUpdateConfig} 
             allLeads={filteredLeads}
             onImportLeads={handleImportLeads}
+            isSupabaseConnected={isSupabaseConnected}
+            isSyncing={isSyncing}
+            onSyncToSupabase={handleSyncLocalToSupabase}
+            onFetchFromSupabase={handleFetchFromSupabase}
           />
         );
       default:
@@ -594,6 +1031,7 @@ export default function App() {
         error={loginError} 
         theme={config.theme}
         onToggleTheme={() => handleUpdateConfig({ ...config, theme: config.theme === 'light' ? 'dark' : 'light' })}
+        isLoading={isLoggingIn}
       />
     );
   }
@@ -778,6 +1216,20 @@ export default function App() {
 
             {/* Top Bar Quick Status Indicators */}
             <div className="flex items-center gap-2.5">
+              {/* Supabase Status Indicator */}
+              <div className={`border px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 ${
+                isSupabaseConnected 
+                  ? config.theme === 'dark' 
+                    ? 'bg-cyan-950/20 text-cyan-400 border-cyan-900/30' 
+                    : 'bg-cyan-50 text-cyan-700 border-cyan-100/50'
+                  : config.theme === 'dark'
+                    ? 'bg-amber-950/20 text-amber-400 border-amber-900/30'
+                    : 'bg-amber-50 text-amber-700 border-amber-100/50'
+              }`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${isSupabaseConnected ? 'bg-cyan-400 animate-pulse' : 'bg-amber-500'}`} />
+                {isSupabaseConnected ? 'Supabase' : 'Lokal (Offline)'}
+              </div>
+
               <div className={`border px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 ${
                 config.theme === 'dark' 
                   ? 'bg-emerald-950/20 text-emerald-400 border-emerald-900/30' 

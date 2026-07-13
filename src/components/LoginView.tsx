@@ -14,15 +14,16 @@ interface LoginViewProps {
   error?: string;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
+  isLoading?: boolean;
 }
 
-export const LoginView: React.FC<LoginViewProps> = ({ onLogin, error, theme, onToggleTheme }) => {
+export const LoginView: React.FC<LoginViewProps> = ({ onLogin, error, theme, onToggleTheme, isLoading = false }) => {
   const [code, setCode] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (code.trim()) {
+    if (code.trim() && !isLoading) {
       onLogin(code.trim());
     }
   };
@@ -71,17 +72,19 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, error, theme, onT
                 placeholder="Access Code"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
+                disabled={isLoading}
                 className={`w-full px-4 py-2.5 rounded-md text-base font-mono tracking-[0.25em] text-center focus:outline-none focus:ring-1 focus:ring-orange-500/30 transition-all ${
                   isDark 
                     ? 'bg-zinc-950 border border-zinc-800 text-zinc-200 placeholder:text-zinc-800' 
                     : 'bg-slate-50 border border-slate-100 text-slate-800 placeholder:text-slate-200'
-                }`}
+                } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                 autoFocus
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${isDark ? 'text-zinc-800 hover:text-zinc-600' : 'text-slate-200 hover:text-slate-400'}`}
+                disabled={isLoading}
+                className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${isDark ? 'text-zinc-800 hover:text-zinc-600' : 'text-slate-200 hover:text-slate-400'} ${isLoading ? 'opacity-30 cursor-not-allowed' : ''}`}
               >
                 {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </button>
@@ -100,10 +103,22 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLogin, error, theme, onT
 
             <button
               type="submit"
-              className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-md font-bold text-[9px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all active:scale-95"
+              disabled={isLoading}
+              className={`w-full py-3 bg-orange-500 hover:bg-orange-600 text-white rounded-md font-bold text-[9px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 transition-all active:scale-95 ${
+                isLoading ? 'opacity-70 cursor-not-allowed bg-orange-600/80' : ''
+              }`}
             >
-              <span>Authorize</span>
-              <ChevronRight className="w-3.5 h-3.5" />
+              {isLoading ? (
+                <>
+                  <div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  <span>Verifying...</span>
+                </>
+              ) : (
+                <>
+                  <span>Authorize</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </>
+              )}
             </button>
           </form>
         </div>

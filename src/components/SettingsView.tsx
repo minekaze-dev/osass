@@ -7,7 +7,8 @@ import React, { useState, useRef } from 'react';
 import { motion } from 'motion/react';
 import { 
   Settings, User, Target, Clock, ShieldAlert, 
-  Download, Upload, Check, AlertCircle, Sparkles, Moon, Sun 
+  Download, Upload, Check, AlertCircle, Sparkles, Moon, Sun,
+  Database, RefreshCw, CloudLightning, Code2
 } from 'lucide-react';
 import { SalesConfig, Lead } from '../types';
 
@@ -16,9 +17,22 @@ interface SettingsViewProps {
   onUpdateConfig: (newConfig: SalesConfig) => void;
   allLeads: Lead[];
   onImportLeads: (importedLeads: Lead[]) => void;
+  isSupabaseConnected?: boolean;
+  isSyncing?: boolean;
+  onSyncToSupabase?: () => void;
+  onFetchFromSupabase?: () => void;
 }
 
-export default function SettingsView({ config, onUpdateConfig, allLeads, onImportLeads }: SettingsViewProps) {
+export default function SettingsView({ 
+  config, 
+  onUpdateConfig, 
+  allLeads, 
+  onImportLeads,
+  isSupabaseConnected = false,
+  isSyncing = false,
+  onSyncToSupabase,
+  onFetchFromSupabase
+}: SettingsViewProps) {
   const [monthlyTarget, setMonthlyTarget] = useState(config.monthlyTarget);
   const [reminderMode, setReminderMode] = useState<'auto' | 'manual'>(config.reminderMode || 'auto');
   const [reminderThinkingDays, setReminderThinkingDays] = useState(config.reminderThinkingDays);
@@ -29,6 +43,7 @@ export default function SettingsView({ config, onUpdateConfig, allLeads, onImpor
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
+  const [showSql, setShowSql] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = (e: React.FormEvent) => {
@@ -390,6 +405,182 @@ export default function SettingsView({ config, onUpdateConfig, allLeads, onImpor
         </div>
         <div className="text-[10px] text-slate-400 text-center pt-4">
            v1.0.0 beta build for The Achiever
+        </div>
+      </div>
+
+      {/* Supabase Sync Panel */}
+      <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs space-y-4 h-fit">
+        
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+          <Database className="w-5 h-5 text-[#F58220]" />
+          <div>
+            <h3 className="text-sm font-bold text-slate-800">Integrasi Database Supabase</h3>
+            <p className="text-[10px] text-slate-400">Hubungkan & sinkronisasikan data asisten ke Supabase.</p>
+          </div>
+        </div>
+
+        {/* Connection status badge */}
+        <div className={`p-3 rounded-xl border flex items-center gap-2.5 ${
+          isSupabaseConnected 
+            ? 'bg-cyan-50 border-cyan-200 text-cyan-800' 
+            : 'bg-amber-50 border-amber-200 text-amber-800'
+        }`}>
+          <CloudLightning className={`w-4 h-4 shrink-0 ${isSupabaseConnected ? 'text-cyan-600 animate-pulse' : 'text-amber-600'}`} />
+          <div className="text-xs">
+            <span className="font-bold">Status Koneksi:</span>{' '}
+            <span className="font-black underline uppercase">
+              {isSupabaseConnected ? 'Tersambung (Online)' : 'Lokal / Offline'}
+            </span>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              {isSupabaseConnected 
+                ? 'Seluruh penambahan dan perubahan data akan disimpan langsung ke database cloud.' 
+                : 'Menyimpan ke memori browser lokal. Dapatkan credentials Supabase dan letakkan di .env untuk mengaktifkan database online.'}
+            </p>
+          </div>
+        </div>
+
+        {/* Sync buttons */}
+        <div className="space-y-2 pt-1">
+          <button
+            type="button"
+            disabled={isSyncing}
+            onClick={onSyncToSupabase}
+            className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            Unggah Data Lokal ke Supabase
+          </button>
+
+          <button
+            type="button"
+            disabled={isSyncing}
+            onClick={onFetchFromSupabase}
+            className="w-full py-2.5 px-4 bg-orange-50 hover:bg-orange-100/70 text-[#F58220] font-bold border border-orange-200/50 rounded-xl text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+          >
+            <Database className="w-4 h-4" />
+            Ambil Data Terbaru dari Supabase
+          </button>
+        </div>
+
+        {/* Toggle Schema SQL */}
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={() => setShowSql(!showSql)}
+            className="w-full py-1.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg border border-slate-200/60 transition-all flex items-center justify-between gap-1 cursor-pointer"
+          >
+            <span className="flex items-center gap-1">
+              <Code2 className="w-3.5 h-3.5 text-[#F58220]" />
+              {showSql ? 'Sembunyikan SQL Schema' : 'Tampilkan SQL Schema Supabase'}
+            </span>
+            <span className="text-[10px] font-normal">{showSql ? '▼' : '▶'}</span>
+          </button>
+
+          {showSql && (
+            <div className="mt-2.5 p-3 bg-zinc-900 border border-zinc-800 rounded-xl font-mono text-[9px] text-zinc-300 overflow-x-auto max-h-[220px] scrollbar-thin">
+              <div className="flex justify-between items-center pb-2 mb-2 border-b border-zinc-800">
+                <span className="text-zinc-500 text-[8px] uppercase">SQL Query Editor</span>
+                <span className="text-[#F58220] text-[8px]">Copy & Run di Supabase</span>
+              </div>
+              <pre className="whitespace-pre">{`-- 1. Create Users Table
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  name TEXT,
+  code TEXT UNIQUE,
+  role TEXT,
+  created_at TEXT
+);
+
+-- 2. Create Config Table
+CREATE TABLE IF NOT EXISTS config (
+  id TEXT PRIMARY KEY,
+  "salesName" TEXT,
+  "monthlyTarget" INTEGER,
+  "reminderMode" TEXT,
+  "reminderThinkingDays" INTEGER,
+  "reminderNBPDays" INTEGER,
+  theme TEXT,
+  "reminderPattern" TEXT
+);
+
+-- 3. Create Leads Table
+CREATE TABLE IF NOT EXISTS leads (
+  id TEXT PRIMARY KEY,
+  "userId" TEXT REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT,
+  whatsapp TEXT,
+  address TEXT,
+  area TEXT,
+  source TEXT,
+  "packageInterest" TEXT,
+  notes TEXT,
+  pipeline TEXT,
+  status TEXT,
+  "nextReminderDate" TEXT,
+  "lastFollowUpDate" TEXT,
+  "followUpCount" INTEGER DEFAULT 0,
+  "customerStatus" TEXT,
+  "closingDate" TEXT,
+  "subscriptionPeriod" TEXT,
+  "customerId" TEXT,
+  "closingStatus" TEXT,
+  history JSONB DEFAULT '[]'::jsonb,
+  "createdAt" TEXT
+);
+
+-- 4. Enable Row Level Security (RLS)
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+
+-- 5. Create RLS Policies for Public Access (Using Anon Key)
+-- Users Policies
+DROP POLICY IF EXISTS "Public Select Users" ON users;
+CREATE POLICY "Public Select Users" ON users FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public Insert Users" ON users;
+CREATE POLICY "Public Insert Users" ON users FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public Update Users" ON users;
+CREATE POLICY "Public Update Users" ON users FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Public Delete Users" ON users;
+CREATE POLICY "Public Delete Users" ON users FOR DELETE USING (true);
+
+-- Config Policies
+DROP POLICY IF EXISTS "Public Select Config" ON config;
+CREATE POLICY "Public Select Config" ON config FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public Insert Config" ON config;
+CREATE POLICY "Public Insert Config" ON config FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public Update Config" ON config;
+CREATE POLICY "Public Update Config" ON config FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Public Delete Config" ON config;
+CREATE POLICY "Public Delete Config" ON config FOR DELETE USING (true);
+
+-- Leads Policies
+DROP POLICY IF EXISTS "Public Select Leads" ON leads;
+CREATE POLICY "Public Select Leads" ON leads FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public Insert Leads" ON leads;
+CREATE POLICY "Public Insert Leads" ON leads FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public Update Leads" ON leads;
+CREATE POLICY "Public Update Leads" ON leads FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Public Delete Leads" ON leads;
+CREATE POLICY "Public Delete Leads" ON leads FOR DELETE USING (true);
+
+-- 6. Insert Default Admin & Sales Assistant Users
+INSERT INTO users (id, name, code, role, created_at)
+VALUES 
+  ('admin-001', 'Super Admin', '1admosass', 'admin', NOW()::text),
+  ('sales-001', 'Sales Assistant', '123456', 'user', NOW()::text)
+ON CONFLICT (id) DO NOTHING;`}</pre>
+            </div>
+          )}
         </div>
       </div>
 
