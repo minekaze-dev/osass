@@ -7,7 +7,8 @@ import React, { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { 
   Search, Filter, MessageSquare, Phone, MapPin, 
-  RefreshCw, Eye, Tag, Calendar, HelpCircle, LayoutGrid, CheckCircle2, Clock 
+  RefreshCw, Eye, Tag, Calendar, HelpCircle, LayoutGrid, CheckCircle2, Clock, 
+  Edit2, Check, X
 } from 'lucide-react';
 import { Lead, FollowUpStatus, PipelineStage, SalesConfig } from '../types';
 import { 
@@ -34,6 +35,7 @@ interface ProspekViewProps {
   leads: Lead[];
   onViewLead: (lead: Lead, historyOnly?: boolean) => void;
   onUpdateStatus: (lead: Lead) => void;
+  onUpdateLead: (lead: Lead) => void;
   config: SalesConfig;
   userName: string;
 }
@@ -45,6 +47,14 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
   const [selectedSource, setSelectedSource] = useState<string>('All');
   const [selectedArea, setSelectedArea] = useState<string>('All');
   const [selectedDate, setSelectedDate] = useState<string>('');
+  const [editingRow, setEditingRow] = useState<string | null>(null);
+  const [tempDate, setTempDate] = useState<string>('');
+
+  // Handle row edit start
+  const startEditing = (lead: Lead) => {
+    setEditingRow(lead.id);
+    setTempDate(lead.createdAt);
+  };
 
   // Pipeline Counts for top progress summary bar
   const pipelineCounts = useMemo(() => {
@@ -334,10 +344,19 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
 
                       {/* Created At (Initial chat date) */}
                       <td className="py-2.5 px-3 whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-50 text-orange-600 border border-orange-100 dark:text-orange-300 font-bold text-[10px]">
-                          <Calendar className="w-3 h-3 text-[#F58220]" />
-                          <span>{formatDate(prospect.createdAt)}</span>
-                        </div>
+                        {editingRow === prospect.id ? (
+                          <input
+                            type="date"
+                            value={tempDate}
+                            onChange={(e) => setTempDate(e.target.value)}
+                            className="px-1.5 py-0.5 border border-slate-200 rounded-md text-[11px] bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-orange-200 font-mono"
+                          />
+                        ) : (
+                          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-50 text-orange-600 border border-orange-100 dark:text-orange-300 font-bold text-[10px]">
+                            <Calendar className="w-3 h-3 text-[#F58220]" />
+                            <span>{formatDate(prospect.createdAt)}</span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Source */}
@@ -373,33 +392,65 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
                       {/* Actions */}
                       <td className="py-2.5 px-3 text-right pr-4 whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Chat WA */}
-                          <a
-                            href={waUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-lg transition-all"
-                            title="WhatsApp"
-                          >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                          </a>
+                          {editingRow === prospect.id ? (
+                            <>
+                              <button
+                                onClick={() => {
+                                    onUpdateLead({...prospect, createdAt: tempDate});
+                                    setEditingRow(null);
+                                }}
+                                className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all shadow-sm flex items-center justify-center"
+                                title="Simpan"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setEditingRow(null)}
+                                className="p-1 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg transition-all flex items-center justify-center"
+                                title="Batal"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              {/* Chat WA */}
+                              <a
+                                href={waUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-lg transition-all"
+                                title="WhatsApp"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                              </a>
 
-                          <button
-                            onClick={() => onUpdateStatus(prospect)}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg transition-all border border-amber-200/30"
-                            title="Update Status"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" />
-                            <span className="text-[10px] font-bold">Update</span>
-                          </button>
+                              <button
+                                onClick={() => startEditing(prospect)}
+                                className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-bold flex items-center justify-center transition-all border border-amber-200/30"
+                                title="Edit Tanggal"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
 
-                          <button
-                            onClick={() => onViewLead(prospect, true)}
-                            className="p-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg transition-all"
-                            title="Detail"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
+                              <button
+                                onClick={() => onUpdateStatus(prospect)}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg transition-all border border-amber-200/30"
+                                title="Update Status"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                <span className="text-[10px] font-bold">Update</span>
+                              </button>
+
+                              <button
+                                onClick={() => onViewLead(prospect, true)}
+                                className="p-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg transition-all"
+                                title="Detail"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </motion.tr>

@@ -78,8 +78,8 @@ export default function CustomerView({
     setEditingRow(lead.id);
     setTempStatus(lead.customerStatus || (lead.pipeline === 'Aktif' ? 'Aktif' : 'Follow Up'));
     
-    // Default to today if not set
-    const defaultDate = lead.closingDate || new Date('2026-07-10').toISOString().split('T')[0];
+    // Default to createdAt if not set
+    const defaultDate = lead.closingDate || lead.createdAt;
     setTempClosingDate(defaultDate);
     
     setTempPeriod(lead.subscriptionPeriod || 'Tahunan');
@@ -346,7 +346,8 @@ export default function CustomerView({
                   <th className="py-2.5 px-3 font-bold whitespace-nowrap text-center">No</th>
                   <th className="py-2.5 px-2 font-bold whitespace-nowrap">Customer</th>
                   <th className="py-2.5 px-2 font-bold whitespace-nowrap">Closing Status</th>
-                  <th className="py-2.5 px-2 font-bold whitespace-nowrap">Tanggal</th>
+                  <th className="py-2.5 px-2 font-bold whitespace-nowrap">Tgl Input</th>
+                  <th className="py-2.5 px-2 font-bold whitespace-nowrap">Tgl Aktif</th>
                   <th className="py-2.5 px-2 font-bold whitespace-nowrap">Paket</th>
                   <th className="py-2.5 px-2 font-bold whitespace-nowrap">Periode</th>
                   <th className="py-2.5 px-2 font-bold whitespace-nowrap">Status</th>
@@ -426,6 +427,11 @@ export default function CustomerView({
                         </select>
                       </td>
 
+                      {/* Created At */}
+                      <td className="py-2.5 px-2 whitespace-nowrap text-[11px] text-slate-500 font-mono">
+                        {lead.createdAt}
+                      </td>
+
                       {/* Closing Date */}
                       <td className="py-2.5 px-2 whitespace-nowrap">
                         {isEditing ? (
@@ -435,22 +441,13 @@ export default function CustomerView({
                             onChange={(e) => setTempClosingDate(e.target.value)}
                             className="px-1.5 py-0.5 border border-slate-200 rounded-md text-[11px] bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-orange-200 font-mono"
                           />
-                        ) : (
-                          <div className="text-[11px] text-slate-600 font-mono whitespace-nowrap">
-                            {lead.closingDate ? (
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-                                {lead.closingDate}
-                              </span>
-                            ) : lead.pipeline === 'Aktif' ? (
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-                                {lead.lastFollowUpDate || lead.createdAt}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 italic">Belum closing</span>
-                            )}
+                        ) : lead.closingDate ? (
+                          <div className="text-[11px] text-emerald-700 font-mono flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-md w-fit">
+                            <Calendar className="w-3 h-3 text-emerald-600 shrink-0" />
+                            {lead.closingDate}
                           </div>
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">-</span>
                         )}
                       </td>
 

@@ -1077,6 +1077,11 @@ export default function App() {
             userName={currentUserName}
             onViewLead={(lead, historyOnly) => { setIsHistoryOnly(historyOnly || false); setViewLead(lead); }} 
             onUpdateStatus={(lead) => setUpdateLead(lead)} 
+            onUpdateLead={(lead) => {
+              const newLeads = leads.map(l => l.id === lead.id ? lead : l);
+              setLeads(newLeads);
+              localStorage.setItem('oxygen_leads', JSON.stringify(newLeads));
+            }}
             config={config}
           />
         );
@@ -1344,19 +1349,7 @@ export default function App() {
 
             {/* Top Bar Quick Status Indicators */}
             <div className="flex items-center gap-2.5">
-              {/* Supabase Status Indicator */}
-              <div className={`border px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 ${
-                isSupabaseConnected 
-                  ? config.theme === 'dark' 
-                    ? 'bg-cyan-950/20 text-cyan-400 border-cyan-900/30' 
-                    : 'bg-cyan-50 text-cyan-700 border-cyan-100/50'
-                  : config.theme === 'dark'
-                    ? 'bg-amber-950/20 text-amber-400 border-amber-900/30'
-                    : 'bg-amber-50 text-amber-700 border-amber-100/50'
-              }`}>
-                <div className={`w-1.5 h-1.5 rounded-full ${isSupabaseConnected ? 'bg-cyan-400 animate-pulse' : 'bg-amber-500'}`} />
-                {isSupabaseConnected ? 'Supabase' : 'Lokal (Offline)'}
-              </div>
+
 
               <div className={`border px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 ${
                 config.theme === 'dark' 

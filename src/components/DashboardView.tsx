@@ -242,7 +242,7 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
         }`}>
           <div className="flex justify-between items-center text-xs">
             <span className={`font-semibold ${config.theme === 'dark' ? 'text-zinc-400' : 'text-slate-600'}`}>
-              {selectedMonth === 'All' ? 'Target Closing Total' : `Target Closing ${formatMonthYear(selectedMonth)}`}
+              {selectedMonth === 'All' ? 'Target SA Total' : `Target SA ${formatMonthYear(selectedMonth)}`}
             </span>
             <span className="font-bold text-[#F58220]">{monthlyClosings} / {config.monthlyTarget} <span className="text-[10px] font-medium opacity-80">({targetProgress}%)</span></span>
           </div>
@@ -308,7 +308,7 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
           </div>
           <div>
             <span className={`text-xs block font-medium ${config.theme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>
-              {selectedMonth === 'All' ? 'Total Closing' : `Closing ${formatMonthYear(selectedMonth)}`}
+              {selectedMonth === 'All' ? 'Total SA' : `Total SA ${formatMonthYear(selectedMonth)}`}
             </span>
             <span className={`text-xl font-bold ${config.theme === 'dark' ? 'text-zinc-100' : 'text-slate-800'}`}>
               {monthlyClosings}
