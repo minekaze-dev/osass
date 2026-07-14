@@ -39,9 +39,10 @@ export default function LeadView({ leads, onAddLead, onViewLead, config, userNam
   // Duplicate state
   const [duplicateLead, setDuplicateLead] = useState<Lead | null>(null);
 
-  // Filter latest 4 leads
+  // Filter latest leads created today
   const recentLeads = [...leads]
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .filter(l => l.createdAt === '2026-07-10')
+    .sort((a, b) => b.id.localeCompare(a.id))
     .slice(0, 4);
 
   const handleWhatsappChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -256,7 +257,7 @@ export default function LeadView({ leads, onAddLead, onViewLead, config, userNam
               className="w-full py-2.5 bg-[#F58220] hover:bg-[#E0721B] disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl text-sm transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-2"
             >
               <UserPlus className="w-4 h-4" />
-              Simpan Data Customer & Jadwalkan Follow Up
+              Simpan & Follow Up
             </button>
           </div>
         </form>
@@ -268,7 +269,7 @@ export default function LeadView({ leads, onAddLead, onViewLead, config, userNam
           <Clock className="w-5 h-5 text-[#F58220]" />
           <div>
             <h3 className="text-sm font-bold text-slate-800">Baru Saja Ditambahkan</h3>
-            <p className="text-[10px] text-slate-400">4 pendaftaran terakhir hari ini.</p>
+            <p className="text-[10px] text-slate-400">Data pendaftaran hari ini.</p>
           </div>
         </div>
 

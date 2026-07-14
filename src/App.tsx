@@ -1364,7 +1364,7 @@ export default function App() {
                   : 'bg-emerald-50 text-emerald-700 border-emerald-100/50'
               }`}>
                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                {isAdmin ? 'Master Control' : 'Asisten Aktif'}
+                {isAdmin ? 'Master Control' : 'Online'}
               </div>
               
               <button 
