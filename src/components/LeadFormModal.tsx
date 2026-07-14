@@ -66,13 +66,13 @@ export default function LeadFormModal({
         setPackageInterest('-');
         setNotes('');
         setPipeline('Lead Baru');
-        setStatus('Interested');
+        setStatus('NBP');
       }
       setDuplicateLead(null);
     }
   }, [isOpen, initialWhatsApp, leadToEdit]);
 
-  // Handle WhatsApp change and check duplicates
+      // Handle WhatsApp change and check duplicates
   const handleWhatsappChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value.replace(/\D/g, ''); // Limit to numbers only
 
@@ -354,43 +354,6 @@ export default function LeadFormModal({
                         className="block w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 focus:outline-none focus:border-[#F58220] transition-colors resize-none placeholder:text-slate-400"
                       />
                     </div>
-
-                    {/* Pipeline & Status selection in Edit mode */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase">
-                          Alur Prospek
-                        </label>
-                        <select
-                          value={pipeline}
-                          onChange={(e) => setPipeline(e.target.value as PipelineStage)}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 focus:outline-none focus:border-[#F58220] transition-colors"
-                        >
-                          {PIPELINE_STAGES.map((pl) => (
-                            <option key={pl} value={pl}>
-                              {pl}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase">
-                          Status Follow Up
-                        </label>
-                        <select
-                          value={status}
-                          onChange={(e) => setStatus(e.target.value as FollowUpStatus)}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 focus:outline-none focus:border-[#F58220] transition-colors"
-                        >
-                          {FOLLOW_UP_STATUSES.map((st) => (
-                            <option key={st} value={st}>
-                              {st}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
                   </>
                 ) : (
                   <>
@@ -411,45 +374,27 @@ export default function LeadFormModal({
                         ))}
                       </select>
                     </div>
-
-                    {/* Pipeline and Status Selectors */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase">
-                          Alur Prospek (Pipeline)
-                        </label>
-                        <select
-                          value={pipeline}
-                          onChange={(e) => setPipeline(e.target.value as PipelineStage)}
-                          className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 focus:outline-none focus:border-[#F58220] transition-colors"
-                        >
-                          {PIPELINE_STAGES.map((pl) => (
-                            <option key={pl} value={pl}>
-                              {pl}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase">
-                          Status Follow Up
-                        </label>
-                        <select
-                          value={status}
-                          onChange={(e) => setStatus(e.target.value as FollowUpStatus)}
-                          className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 focus:outline-none focus:border-[#F58220] transition-colors"
-                        >
-                          {FOLLOW_UP_STATUSES.map((st) => (
-                            <option key={st} value={st}>
-                              {st}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
                   </>
                 )}
+                
+                {/* Status Selector (always shown, defaults to NBP in create mode) */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase">
+                    Status Follow Up
+                  </label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as FollowUpStatus)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-800 focus:outline-none focus:border-[#F58220] transition-colors"
+                  >
+                    {FOLLOW_UP_STATUSES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
 
               </div>
 

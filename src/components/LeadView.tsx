@@ -213,7 +213,7 @@ export default function LeadView({ leads, onAddLead, onViewLead, config, userNam
 
           {/* Pipeline & Status Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
+            <div className="hidden">
               <label className="block text-xs font-bold text-slate-600 mb-1.5 uppercase">
                 Alur Prospek (Pipeline)
               </label>

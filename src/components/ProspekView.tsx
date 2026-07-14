@@ -17,7 +17,8 @@ import {
   formatWhatsAppNumber, 
   getStatusColorClasses, 
   getPipelineColorClasses,
-  PACKAGE_PRICES
+  PACKAGE_PRICES,
+  LEAD_SOURCES
 } from '../utils/helpers';
 
 const splitPackage = (pkgStr: string) => {
@@ -41,6 +42,7 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
   const [search, setSearch] = useState('');
   const [selectedPipeline, setSelectedPipeline] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
+  const [selectedSource, setSelectedSource] = useState<string>('All');
   const [selectedArea, setSelectedArea] = useState<string>('All');
   const [selectedDate, setSelectedDate] = useState<string>('');
 
@@ -76,13 +78,16 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
       // Status match
       const matchesStatus = selectedStatus === 'All' || l.status === selectedStatus;
 
+      // Source match
+      const matchesSource = selectedSource === 'All' || l.source === selectedSource;
+
       // Area match
       const matchesArea = selectedArea === 'All' || l.area === selectedArea;
 
       // Date match
       const matchesDate = !selectedDate || l.createdAt === selectedDate;
 
-      return matchesSearch && matchesPipeline && matchesStatus && matchesArea && matchesDate;
+      return matchesSearch && matchesPipeline && matchesStatus && matchesArea && matchesSource && matchesDate;
     });
 
     // Sort by latest createdAt date descending
@@ -97,6 +102,7 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
     <div className="space-y-6">
       
       {/* Pipeline Stages Visual Counter */}
+      {/* 
       <div className="bg-white dark:bg-[#1c1c1f] rounded-2xl border border-slate-100 dark:border-zinc-800 p-4 shadow-xs overflow-x-auto">
         <div className="flex items-center justify-between mb-3 shrink-0">
           <span className="text-xs font-bold text-[#F58220] uppercase tracking-wider flex items-center gap-1">
@@ -133,6 +139,7 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
           })}
         </div>
       </div>
+      */}
 
       {/* Filters & Search Header */}
       <div className="bg-white dark:bg-[#1c1c1f] rounded-2xl border border-slate-100 dark:border-zinc-800 p-5 shadow-xs space-y-4">
@@ -153,7 +160,7 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
         {/* Row 2: Select Filters */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           {/* Pipeline stage */}
-          <div>
+          <div className="hidden">
             <label className="block text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase mb-1 flex items-center gap-1">
               <Filter className="w-3 h-3" /> Filter Alur
             </label>
@@ -199,6 +206,23 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
               <option value="All">Semua Wilayah</option>
               {AREAS.map(ar => (
                 <option key={ar} value={ar}>{ar}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Source filter */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 dark:text-zinc-400 uppercase mb-1 flex items-center gap-1">
+              <Tag className="w-3 h-3" /> Filter Sumber
+            </label>
+            <select
+              value={selectedSource}
+              onChange={(e) => setSelectedSource(e.target.value)}
+              className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-700 dark:text-zinc-300 focus:outline-none focus:border-[#F58220] transition-colors"
+            >
+              <option value="All">Semua Sumber</option>
+              {LEAD_SOURCES.map(s => (
+                <option key={s} value={s}>{s}</option>
               ))}
             </select>
           </div>
@@ -251,10 +275,10 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
                 <tr className="bg-slate-50/70 dark:bg-zinc-900/60 border-b border-slate-100 dark:border-zinc-800 text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
                   <th className="py-2.5 px-3 font-bold whitespace-nowrap text-center">No</th>
                   <th className="py-2.5 px-3 font-bold whitespace-nowrap">Customer</th>
+                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Telepon</th>
                   <th className="py-2.5 px-3 font-bold whitespace-nowrap">Tanggal</th>
-                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Wilayah</th>
-                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Alur & Status</th>
-                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Paket</th>
+                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Sumber Data</th>
+                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Status</th>
                   <th className="py-2.5 px-3 font-bold whitespace-nowrap">FU</th>
                   <th className="py-2.5 px-3 text-right pr-4 font-bold whitespace-nowrap">Aksi</th>
                 </tr>
@@ -296,12 +320,16 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
                         <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 font-medium">{idx + 1}</span>
                       </td>
 
-                      {/* Name & WA */}
+                      {/* Name */}
                       <td className="py-2.5 px-3 whitespace-nowrap">
                         <div className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-[13px] truncate max-w-[120px]">
                           {prospect.name && prospect.name.trim() !== '' && prospect.name !== '-' ? prospect.name : '-'}
                         </div>
-                        <div className="text-[9px] text-slate-400 dark:text-zinc-500 font-mono mt-0.5">{prospect.whatsapp}</div>
+                      </td>
+
+                      {/* Phone */}
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                         <div className="text-[11px] text-slate-600 dark:text-zinc-300 font-mono">{prospect.whatsapp}</div>
                       </td>
 
                       {/* Created At (Initial chat date) */}
@@ -312,54 +340,34 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
                         </div>
                       </td>
 
-                      {/* Area & Source */}
+                      {/* Source */}
                       <td className="py-2.5 px-3 whitespace-nowrap">
-                        <div className="font-semibold text-slate-700 dark:text-zinc-200 text-[11px] truncate max-w-[80px]">
-                          {prospect.area && prospect.area.trim() !== '' && prospect.area !== '-' ? prospect.area : '-'}
-                        </div>
-                        <div className="text-[9px] text-slate-400 dark:text-zinc-500 flex items-center gap-0.5 mt-0.5">
-                          <Tag className="w-2.5 h-2.5 text-[#F58220] shrink-0" />
-                          <span className="truncate max-w-[60px]">{prospect.source || '-'}</span>
+                        <div className="flex items-center gap-1.5">
+                           <Tag className="w-3 h-3 text-[#F58220]" />
+                           <span className="font-bold text-slate-700 dark:text-zinc-200 text-[11px]">{prospect.source || '-'}</span>
                         </div>
                       </td>
 
-                      {/* Pipeline Stage & Status */}
+                      {/* Status */}
                       <td className="py-2.5 px-3 whitespace-nowrap">
-                        <div className="flex flex-col gap-0.5 items-start">
-                          <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-bold ${getPipelineColorClasses(prospect.pipeline)}`}>
-                            {prospect.pipeline}
-                          </span>
-                          <span className={`px-1.5 py-0.5 rounded-md text-[8px] font-bold border ${getStatusColorClasses(prospect.status).bg}`}>
-                            {prospect.status}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Package interest */}
-                      <td className="py-2.5 px-3">
-                        {(() => {
-                          const pkg = prospect.packageInterest;
-                          if (!pkg || pkg === '-' || pkg.trim() === '') {
-                            return <span className="text-slate-400 dark:text-zinc-500 font-medium">-</span>;
-                          }
-                          const speedMatch = pkg.match(/(\d+)\s*Mbps/);
-                          const speed = speedMatch ? speedMatch[0] : '';
-                          const pkgName = speedMatch ? pkg.substring(0, speedMatch.index).trim() : pkg;
-                          
-                          return (
-                            <div className="whitespace-nowrap">
-                              <div className="font-bold text-slate-800 dark:text-zinc-200 text-[11px] truncate max-w-[100px]" title={pkgName}>
-                                {pkgName}
-                              </div>
-                              {speed && <div className="text-[9px] text-[#F58220] font-bold mt-0.5">{speed}</div>}
-                            </div>
-                          );
-                        })()}
+                        <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold border ${getStatusColorClasses(prospect.status).bg}`}>
+                          {prospect.status}
+                        </span>
                       </td>
 
                       {/* Follow-up count & optional reminder */}
                       <td className="py-2.5 px-3 whitespace-nowrap">
-                        <div className="font-semibold text-slate-700 dark:text-zinc-300 text-[10px]">{prospect.followUpCount}x FU</div>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-800 dark:text-zinc-200 text-[10px]">{prospect.followUpCount}x FU</span>
+                          <span className="text-[10px] text-slate-500 dark:text-zinc-400">
+                            {(() => {
+                              if (prospect.followUpCount === 0) return 'Hari ke-0';
+                              const pattern = (config.reminderPattern || '1,2,4,7').split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+                              const day = pattern[prospect.followUpCount - 1] || prospect.followUpCount;
+                              return `Hari ke-${day}`;
+                            })()}
+                          </span>
+                        </div>
                       </td>
 
                       {/* Actions */}

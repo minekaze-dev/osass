@@ -155,6 +155,8 @@ export const PIPELINE_STAGES = [
   'Follow Up',
   'Menunggu Berkas',
   'Tidak Tercover',
+  'Tidak Jadi Pasang',
+  'Sudah Pasang oleh DS',
   'Instalasi',
   'Aktif'
 ] as const;
@@ -308,6 +310,10 @@ export const getPipelineColorClasses = (stage: string) => {
       return 'bg-amber-100 text-amber-800';
     case 'Tidak Tercover':
       return 'bg-rose-100 text-rose-800 font-medium';
+    case 'Tidak Jadi Pasang':
+      return 'bg-red-100 text-red-800';
+    case 'Sudah Pasang oleh DS':
+      return 'bg-teal-100 text-teal-800';
     case 'Instalasi':
       return 'bg-orange-100 text-orange-800';
     case 'Aktif':

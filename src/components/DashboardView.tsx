@@ -202,11 +202,17 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
         config.theme === 'dark' ? 'bg-[#18181b] border-zinc-800 text-zinc-100' : 'bg-white border-slate-100 shadow-xs'
       }`}>
         <div className="flex flex-col gap-1.5">
+          <h1 className={`text-xl font-bold ${config.theme === 'dark' ? 'text-zinc-100' : 'text-slate-800'}`}>
+            Hi, {userName}
+          </h1>
+          <p className={`text-xs ${config.theme === 'dark' ? 'text-zinc-400' : 'text-slate-500'}`}>
+            Semangat Closing Tiap Harinya!
+          </p>
           <div className="flex items-center gap-2">
           </div>
           
           {/* Month Filter Dropdown */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mt-2">
             <span className={`text-xs font-bold flex items-center gap-1 ${config.theme === 'dark' ? 'text-zinc-400' : 'text-slate-500'}`}>
               <Calendar className="w-3.5 h-3.5 opacity-70" />
               Periode Dashboard:

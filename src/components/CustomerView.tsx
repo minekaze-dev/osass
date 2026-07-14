@@ -17,7 +17,8 @@ import {
   getPipelineColorClasses,
   PACKAGES,
   PERIOD_OPTIONS,
-  PACKAGE_PRICES
+  PACKAGE_PRICES,
+  LEAD_SOURCES
 } from '../utils/helpers';
 
 interface CustomerViewProps {
@@ -60,6 +61,7 @@ export default function CustomerView({
   // Filters state
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [closingFilter, setClosingFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('');
   const [editingRow, setEditingRow] = useState<string | null>(null);
@@ -115,10 +117,13 @@ export default function CustomerView({
         (closingFilter === 'closed' && isClosed) ||
         (closingFilter === 'open' && !isClosed);
 
+      // Source match
+      const matchesSource = sourceFilter === 'all' || l.source === sourceFilter;
+
       // Date Filter
       const matchesDate = !dateFilter || l.createdAt === dateFilter;
 
-      return matchesSearch && matchesStatus && matchesClosing && matchesDate;
+      return matchesSearch && matchesStatus && matchesClosing && matchesSource && matchesDate;
     });
 
     // Sort by latest createdAt date descending
@@ -127,7 +132,7 @@ export default function CustomerView({
       const dateB = new Date(b.createdAt).getTime();
       return dateB - dateA;
     });
-  }, [leads, searchTerm, statusFilter, closingFilter, dateFilter]);
+  }, [leads, searchTerm, statusFilter, closingFilter, sourceFilter, dateFilter]);
 
   // Quick stats
   const stats = useMemo(() => {
@@ -265,6 +270,22 @@ export default function CustomerView({
             </select>
           </div>
 
+          {/* Source Filter */}
+          <div className="flex items-center gap-2">
+            <Tag className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className="text-xs text-slate-500 whitespace-nowrap">Sumber:</span>
+            <select
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+              className="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white text-slate-700 focus:outline-none focus:border-[#F58220]"
+            >
+              <option value="all">Semua Sumber</option>
+              {LEAD_SOURCES.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Closing Status Filter */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500 whitespace-nowrap">Closing:</span>
@@ -387,18 +408,21 @@ export default function CustomerView({
                       <td className="py-2.5 px-2 whitespace-nowrap">
                         <select
                           value={lead.closingStatus || (isClosed ? 'Closed' : 'Not Closed')}
-                          onChange={(e) => onQuickClosing && onQuickClosing(lead.id, e.target.value as 'Not Closed' | 'On Process' | 'Closed')}
+                          onChange={(e) => onQuickClosing && onQuickClosing(lead.id, e.target.value as any)}
                           className={`px-1.5 py-1 border rounded-lg text-[10px] font-bold focus:outline-none focus:ring-1 focus:ring-orange-200 cursor-pointer ${
                             lead.closingStatus === 'Closed' || (!lead.closingStatus && isClosed)
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              : lead.closingStatus === 'On Process'
+                              : lead.closingStatus === 'Installation'
                               ? 'bg-amber-50 text-amber-600 border-amber-200'
+                              : lead.closingStatus === 'Refund'
+                              ? 'bg-rose-50 text-rose-600 border-rose-200'
                               : 'bg-slate-50 text-slate-500 border-slate-200'
                           }`}
                         >
                           <option value="Not Closed" className="font-bold text-slate-600">Not Closed</option>
-                          <option value="On Process" className="font-bold text-amber-600">On Process</option>
+                          <option value="Installation" className="font-bold text-amber-600">Installation</option>
                           <option value="Closed" className="font-bold text-emerald-700">Closed</option>
+                          <option value="Refund" className="font-bold text-rose-600">Refund</option>
                         </select>
                       </td>
 
