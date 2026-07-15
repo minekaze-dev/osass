@@ -197,10 +197,19 @@ export const formatWhatsAppNumber = (num: string): string => {
   return cleaned;
 };
 
+// Get current today date in YYYY-MM-DD format (real time)
+export const getTodayStr = (): string => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const date = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${date}`;
+};
+
 // Calculate how many days have elapsed since creation or last follow up
 export const getDaysElapsed = (startDateStr: string): number => {
   const start = new Date(startDateStr);
-  const today = new Date('2026-07-10'); // Fix relative to current date in metadata
+  const today = new Date(getTodayStr()); // Dynamic based on actual date
   const diffTime = today.getTime() - start.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return diffDays >= 0 ? diffDays : 0;
@@ -237,7 +246,7 @@ export const calculateNextReminderDate = (
   reminderPattern?: string,
   createdAt?: string
 ): string | null => {
-  const today = new Date('2026-07-10'); // Fix relative to current date in metadata
+  const today = new Date(getTodayStr()); // Dynamic based on actual date
   const createdDate = createdAt ? new Date(createdAt) : new Date(today);
   
   const mode = reminderMode || 'auto';

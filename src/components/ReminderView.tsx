@@ -14,7 +14,8 @@ import {
   formatWhatsAppNumber, 
   getStatusColorClasses, 
   getDaysElapsed,
-  isLeadActiveProspect
+  isLeadActiveProspect,
+  getTodayStr
 } from '../utils/helpers';
 
 interface ReminderViewProps {
@@ -28,8 +29,15 @@ interface ReminderViewProps {
 type ReminderGroup = 'hari-ini' | 'besok' | 'terlambat' | 'thinking' | 'nbp';
 
 export default function ReminderView({ leads, onViewLead, onUpdateStatus, config, userName }: ReminderViewProps) {
-  const TODAY_STR = '2026-07-10';
-  const TOMORROW_STR = '2026-07-11';
+  const TODAY_STR = getTodayStr();
+  const TOMORROW_STR = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const date = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${date}`;
+  })();
   
   const [activeGroup, setActiveGroup] = useState<ReminderGroup>('hari-ini');
 

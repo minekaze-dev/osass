@@ -27,7 +27,8 @@ import {
   getDaysElapsed, 
   formatWhatsAppNumber, 
   getStatusColorClasses,
-  isLeadActiveProspect
+  isLeadActiveProspect,
+  getTodayStr
 } from '../utils/helpers';
 
 interface DashboardViewProps {
@@ -40,7 +41,33 @@ interface DashboardViewProps {
 }
 
 export default function DashboardView({ leads, config, userName, onViewLead, onUpdateStatus, onQuickFollowUp }: DashboardViewProps) {
-  const TODAY_STR = '2026-07-10';
+  const TODAY_STR = getTodayStr();
+
+  // Helper to determine the actual transition/closing date in a given month
+  const getTransitionDateInMonth = React.useCallback((l: Lead, monthStr: string): string | null => {
+    // 1. Check history first for transition to 'Aktif' / closed status in this month
+    if (l.history && l.history.length > 0) {
+      const transition = l.history.find(h => 
+        (h.pipeline === 'Aktif' || h.status === 'Installed' || h.status === 'Closing' || h.status === 'Paid') && 
+        h.date && h.date.startsWith(monthStr)
+      );
+      if (transition && transition.date) {
+        return transition.date.split(' ')[0]; // Return "YYYY-MM-DD"
+      }
+    }
+    
+    // 2. Check closingDate
+    if (l.closingDate && l.closingDate.startsWith(monthStr)) {
+      return l.closingDate;
+    }
+    
+    // 3. Check createdAt
+    if (l.createdAt && l.createdAt.startsWith(monthStr)) {
+      return l.createdAt;
+    }
+    
+    return null;
+  }, []);
 
   // Dynamic Month Extractor
   const availableMonths = React.useMemo(() => {
@@ -114,16 +141,15 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
   }, [leads]);
 
   const monthlyClosings = React.useMemo(() => {
-    const isClosed = (l: Lead) => l.pipeline === 'Aktif' || l.status === 'Paid' || l.status === 'Installed' || l.status === 'Closing';
+    const isClosed = (l: Lead) => l.pipeline === 'Aktif' || l.customerStatus === 'Aktif' || l.status === 'Paid' || l.status === 'Installed' || l.status === 'Closing';
     if (selectedMonth === 'All') {
       return leads.filter(isClosed).length;
     }
-    return leads.filter(
-      l => isClosed(l) && 
-           ((l.closingDate && l.closingDate.startsWith(selectedMonth)) || 
-            (!l.closingDate && l.createdAt.startsWith(selectedMonth)))
-    ).length;
-  }, [leads, selectedMonth]);
+    return leads.filter(l => {
+      if (!isClosed(l)) return false;
+      return getTransitionDateInMonth(l, selectedMonth) !== null;
+    }).length;
+  }, [leads, selectedMonth, getTransitionDateInMonth]);
 
   // Today's Tasks
   const todayTasks = React.useMemo(() => {
@@ -167,9 +193,9 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
       }
 
       // Calculate operational transitions (GP / Paid / Installed)
-      const dateStr = l.closingDate || l.createdAt;
-      if (dateStr.startsWith(selectedMonth)) {
-        const day = parseInt(dateStr.split('-')[2]);
+      const transitionDate = getTransitionDateInMonth(l, selectedMonth);
+      if (transitionDate) {
+        const day = parseInt(transitionDate.split('-')[2]);
         if (day >= 1 && day <= daysInMonth) {
           if (l.status === 'General Payment') {
             data[day - 1].generalPayment += 1;
@@ -184,19 +210,31 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
     });
 
     return data;
-  }, [leads, selectedMonth]);
+  }, [leads, selectedMonth, getTransitionDateInMonth]);
 
   const stats = React.useMemo(() => {
     const totalGP = leads.filter(l => l.status === 'General Payment' && (selectedMonth === 'All' || l.createdAt.startsWith(selectedMonth))).length;
     const totalPaid = leads.filter(l => l.status === 'Paid' && (selectedMonth === 'All' || l.createdAt.startsWith(selectedMonth))).length;
-    const totalInstalled = leads.filter(l => (l.pipeline === 'Aktif' || l.status === 'Installed') && (selectedMonth === 'All' || (l.closingDate || l.createdAt).startsWith(selectedMonth))).length;
-    const todayInstalled = leads.filter(l => (l.pipeline === 'Aktif' || l.status === 'Installed') && (l.closingDate === TODAY_STR || (!l.closingDate && l.createdAt.startsWith(TODAY_STR)))).length;
+    
+    const totalInstalled = leads.filter(l => {
+      const isClosed = l.pipeline === 'Aktif' || l.customerStatus === 'Aktif' || l.status === 'Installed';
+      if (!isClosed) return false;
+      if (selectedMonth === 'All') return true;
+      return getTransitionDateInMonth(l, selectedMonth) !== null;
+    }).length;
+
+    const todayInstalled = leads.filter(l => {
+      const isClosed = l.pipeline === 'Aktif' || l.customerStatus === 'Aktif' || l.status === 'Installed';
+      if (!isClosed) return false;
+      const tDate = getTransitionDateInMonth(l, selectedMonth);
+      return tDate === TODAY_STR;
+    }).length;
 
     const totalIncoming = leads.filter(l => selectedMonth === 'All' || l.createdAt.startsWith(selectedMonth)).length;
     const todayIncoming = leads.filter(l => l.createdAt.startsWith(TODAY_STR)).length;
 
     return { totalGP, totalPaid, totalInstalled, todayInstalled, totalIncoming, todayIncoming };
-  }, [leads, selectedMonth]);
+  }, [leads, selectedMonth, TODAY_STR, getTransitionDateInMonth]);
 
   const targetProgress = Math.min(100, Math.round((monthlyClosings / config.monthlyTarget) * 100));
 
@@ -354,18 +392,18 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                 </div>
               </div>
               
-              <div className="flex flex-nowrap gap-1.5 select-none">
-                <div className={`px-2 py-1 rounded-lg flex flex-col items-center justify-center min-w-[55px] ${config.theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-                  <span className={`text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>TOTAL GP</span>
-                  <span className={`text-xs font-black ${config.theme === 'dark' ? 'text-blue-100' : 'text-blue-700'}`}>{stats.totalGP}</span>
+              <div className="flex flex-nowrap gap-1 md:gap-1.5 select-none items-center">
+                <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[50px] md:min-w-[55px] ${config.theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
+                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>TOTAL GP</span>
+                  <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-blue-100' : 'text-blue-700'}`}>{stats.totalGP}</span>
                 </div>
-                <div className={`px-2 py-1 rounded-lg flex flex-col items-center justify-center min-w-[65px] ${config.theme === 'dark' ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
-                  <span className={`text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>TOTAL PAID</span>
-                  <span className={`text-xs font-black ${config.theme === 'dark' ? 'text-indigo-100' : 'text-indigo-700'}`}>{stats.totalPaid}</span>
+                <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[55px] md:min-w-[65px] ${config.theme === 'dark' ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
+                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>TOTAL PAID</span>
+                  <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-indigo-100' : 'text-indigo-700'}`}>{stats.totalPaid}</span>
                 </div>
-                <div className={`px-2 py-1 rounded-lg flex flex-col items-center justify-center min-w-[100px] border border-emerald-500/20 ${config.theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-                  <span className={`text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>PEMASANGAN HARI INI</span>
-                  <span className={`text-xs font-black ${config.theme === 'dark' ? 'text-emerald-100' : 'text-emerald-700'}`}>{stats.todayInstalled}</span>
+                <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[80px] md:min-w-[95px] border border-emerald-500/20 ${config.theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>PEMASANGAN</span>
+                  <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-emerald-100' : 'text-emerald-700'}`}>{stats.todayInstalled}</span>
                 </div>
               </div>
             </div>

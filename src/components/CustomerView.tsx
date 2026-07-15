@@ -19,7 +19,8 @@ import {
   PERIOD_OPTIONS,
   PACKAGE_PRICES,
   LEAD_SOURCES,
-  isLeadActiveProspect
+  isLeadActiveProspect,
+  getTodayStr
 } from '../utils/helpers';
 
 interface CustomerViewProps {
@@ -77,10 +78,11 @@ export default function CustomerView({
   // Handle row edit start
   const startEditing = (lead: Lead) => {
     setEditingRow(lead.id);
-    setTempStatus(lead.customerStatus || (lead.pipeline === 'Aktif' ? 'Aktif' : 'Follow Up'));
+    const resolvedStatus = lead.customerStatus || (lead.pipeline === 'Aktif' ? 'Aktif' : 'Follow Up');
+    setTempStatus(resolvedStatus);
     
-    // Default to createdAt if not set
-    const defaultDate = lead.closingDate || lead.createdAt;
+    // Default to today if status is 'Aktif' and no closing date is set, otherwise createdAt
+    const defaultDate = lead.closingDate || (resolvedStatus === 'Aktif' ? getTodayStr() : lead.createdAt);
     setTempClosingDate(defaultDate);
     
     setTempPeriod(lead.subscriptionPeriod || 'Tahunan');
@@ -524,7 +526,13 @@ export default function CustomerView({
                         {isEditing ? (
                           <select
                             value={tempStatus}
-                            onChange={(e) => setTempStatus(e.target.value as CustomerStatus)}
+                            onChange={(e) => {
+                              const newStatus = e.target.value as CustomerStatus;
+                              setTempStatus(newStatus);
+                              if (newStatus === 'Aktif' && (!lead.closingDate || tempClosingDate === lead.createdAt)) {
+                                setTempClosingDate(getTodayStr());
+                              }
+                            }}
                             className="px-1 py-0.5 border border-slate-200 rounded-md text-[11px] bg-white text-slate-800 font-bold focus:outline-none focus:ring-1 focus:ring-orange-200"
                           >
                             {CUSTOMER_STATUSES.map(item => (

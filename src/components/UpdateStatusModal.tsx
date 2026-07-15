@@ -12,7 +12,8 @@ import {
   FOLLOW_UP_STATUSES, 
   calculateNextReminderDate,
   getStatusColorClasses,
-  getPipelineColorClasses
+  getPipelineColorClasses,
+  getTodayStr
 } from '../utils/helpers';
 
 interface UpdateStatusModalProps {
@@ -57,7 +58,7 @@ export default function UpdateStatusModal({
       }
       
       // Setup custom date picker default to tomorrow
-      const tomorrow = new Date('2026-07-10');
+      const tomorrow = new Date(getTodayStr());
       tomorrow.setDate(tomorrow.getDate() + 1);
       setCustomReminderDate(tomorrow.toISOString().split('T')[0]);
     }
@@ -348,7 +349,7 @@ export default function UpdateStatusModal({
                       type="date"
                       value={customReminderDate}
                       onChange={(e) => setCustomReminderDate(e.target.value)}
-                      min="2026-07-10"
+                      min={getTodayStr()}
                       className="w-full px-3 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-slate-800 dark:text-zinc-100 focus:outline-none focus:border-amber-500 transition-colors font-mono"
                     />
                   )}

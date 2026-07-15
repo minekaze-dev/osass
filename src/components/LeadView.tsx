@@ -18,7 +18,8 @@ import {
   FOLLOW_UP_STATUSES,
   calculateNextReminderDate,
   getStatusColorClasses, 
-  getPipelineColorClasses 
+  getPipelineColorClasses,
+  getTodayStr
 } from '../utils/helpers';
 
 interface LeadViewProps {
@@ -41,7 +42,7 @@ export default function LeadView({ leads, onAddLead, onViewLead, config, userNam
 
   // Filter latest leads created today
   const recentLeads = [...leads]
-    .filter(l => l.createdAt === '2026-07-10')
+    .filter(l => l.createdAt === getTodayStr())
     .sort((a, b) => b.id.localeCompare(a.id))
     .slice(0, 4);
 

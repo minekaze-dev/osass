@@ -12,7 +12,7 @@ import {
 import { Lead, SalesConfig, FollowUpStatus, PipelineStage, HistoryEntry, CustomerStatus, User, AuthState } from './types';
 import { INITIAL_SALES_CONFIG } from './mockData';
 import { supabase, updateSupabaseCredentials } from './lib/supabase';
-import { isLeadActiveProspect } from './utils/helpers';
+import { isLeadActiveProspect, getTodayStr } from './utils/helpers';
 
 // Views
 import DashboardView from './components/DashboardView';
@@ -127,7 +127,7 @@ export default function App() {
     return saved ? parseInt(saved, 10) : 0;
   });
 
-  const TODAY_STR = '2026-07-10';
+  const TODAY_STR = getTodayStr();
 
   const dueLeadsCount = useMemo(() => {
     const actionable = filteredLeads.filter(isLeadActiveProspect);
@@ -765,7 +765,7 @@ export default function App() {
   // Handle Add Lead
   const handleAddLead = (newLeadData: Omit<Lead, 'id' | 'createdAt' | 'followUpCount' | 'history' | 'lastFollowUpDate' | 'userId'>) => {
     if (!auth.user) return;
-    const todayStr = '2026-07-10'; // Anchor date
+    const todayStr = getTodayStr();
     const timeStr = '10:00';
     const newId = `lead-${Date.now()}`;
     
@@ -806,7 +806,7 @@ export default function App() {
     notes: string, 
     nextReminder: string | null
   ) => {
-    const todayStr = '2026-07-10'; // Anchor date
+    const todayStr = getTodayStr();
     const timeStr = '15:45'; // Simulate real action time
     
     const updated = leads.map(l => {
@@ -819,6 +819,8 @@ export default function App() {
           notes,
         };
 
+        const isActive = pipeline === 'Aktif';
+
         return {
           ...l,
           status,
@@ -826,6 +828,9 @@ export default function App() {
           nextReminderDate: nextReminder,
           lastFollowUpDate: todayStr,
           followUpCount: l.followUpCount + 1,
+          closingDate: isActive ? (l.closingDate || todayStr) : l.closingDate,
+          customerStatus: isActive ? (l.customerStatus || 'Aktif') : l.customerStatus,
+          closingStatus: isActive ? ('Closed' as const) : l.closingStatus,
           history: [newHistoryEntry, ...l.history],
         };
       }
@@ -852,7 +857,7 @@ export default function App() {
     packageInterest?: string,
     customerId?: string
   ) => {
-    const todayStr = '2026-07-10'; // Anchor date
+    const todayStr = getTodayStr();
     const timeStr = '15:45';
     
     const updated = leads.map(l => {
@@ -910,7 +915,7 @@ export default function App() {
 
   // Handle Quick Closing Status Change
   const handleQuickClosing = (leadId: string, action: 'Not Closed' | 'On Process' | 'Closed' | 'Installation' | 'Refund') => {
-    const todayStr = '2026-07-10';
+    const todayStr = getTodayStr();
     const timeStr = '15:45';
     
     const updated = leads.map(l => {
@@ -1028,7 +1033,7 @@ export default function App() {
 
   // Handle Quick Follow Up with checkmark
   const handleQuickFollowUp = (leadId: string) => {
-    const todayStr = '2026-07-10'; // Anchor date
+    const todayStr = getTodayStr();
     const timeStr = '15:45';
     
     const updated = leads.map(l => {
