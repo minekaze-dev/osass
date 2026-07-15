@@ -641,18 +641,6 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                     </p>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => setIsActivityModalOpen(true)}
-                  className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] flex items-center gap-1.5 cursor-pointer transition-colors ${
-                    config.theme === 'dark' 
-                      ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 border border-orange-500/20' 
-                      : 'bg-orange-50 text-[#F58220] hover:bg-orange-100 border border-orange-200'
-                  }`}
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  Input Manual / Import CSV
-                </button>
               </div>
               
               <div className="flex flex-nowrap gap-1 md:gap-1.5 select-none items-center xl:self-center justify-start sm:justify-end">
@@ -740,6 +728,20 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                   <Bar dataKey="refund" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={14} />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+
+            <div className="mt-3 flex justify-start">
+              <button
+                onClick={() => setIsActivityModalOpen(true)}
+                className={`px-3 py-1.5 rounded-xl font-bold text-[11px] flex items-center gap-1.5 cursor-pointer transition-colors ${
+                  config.theme === 'dark' 
+                    ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 border border-orange-500/20' 
+                    : 'bg-orange-50 text-[#F58220] hover:bg-orange-100 border border-orange-200'
+                }`}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                Input Manual / Import CSV
+              </button>
             </div>
           </div>
 
