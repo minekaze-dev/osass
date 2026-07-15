@@ -8,7 +8,7 @@ import { motion } from 'motion/react';
 import { 
   Search, Filter, MessageSquare, Phone, MapPin, 
   RefreshCw, Eye, Tag, Calendar, HelpCircle, LayoutGrid, CheckCircle2, Clock, 
-  Edit2, Check, X, Upload, FileSpreadsheet
+  Edit2, Check, X, Upload, FileSpreadsheet, Database
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Lead, FollowUpStatus, PipelineStage, SalesConfig } from '../types';
@@ -20,7 +20,8 @@ import {
   getStatusColorClasses, 
   getPipelineColorClasses,
   PACKAGE_PRICES,
-  LEAD_SOURCES
+  LEAD_SOURCES,
+  getTodayStr
 } from '../utils/helpers';
 
 const splitPackage = (pkgStr: string) => {
@@ -339,32 +340,52 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
   return (
     <div className="space-y-6">
 
-      {/* Import Prospek Panel */}
-      <div className="bg-white dark:bg-[#1c1c1f] rounded-2xl border border-slate-100 dark:border-zinc-800 p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-orange-50 dark:bg-orange-950/20 rounded-xl shrink-0">
-            <Upload className="w-5 h-5 text-[#F58220]" />
+      {/* Import & Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Import Prospek Panel */}
+        <div className="md:col-span-2 bg-white dark:bg-[#1c1c1f] rounded-2xl border border-slate-100 dark:border-zinc-800 p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-orange-50 dark:bg-orange-950/20 rounded-xl shrink-0">
+              <Upload className="w-5 h-5 text-[#F58220]" />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-zinc-100">Impor Data Prospek</h3>
+              <p className="text-[10px] sm:text-xs text-slate-400 dark:text-zinc-500 mt-0.5">Unggah CSV atau Excel (.xlsx/.xls) dengan kolom: Tanggal, No, No HP, Remark, Note</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-zinc-100">Impor Data Prospek</h3>
-            <p className="text-[10px] sm:text-xs text-slate-400 dark:text-zinc-500 mt-0.5">Unggah CSV atau Excel (.xlsx/.xls) dengan kolom: Tanggal, No, No HP, Remark, Note</p>
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0">
+            <input
+              type="file"
+              id="prospek-file-import"
+              accept=".csv,.xlsx,.xls"
+              onChange={handleImportFile}
+              className="hidden"
+            />
+            <button
+              onClick={() => document.getElementById('prospek-file-import')?.click()}
+              className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-[#F58220] to-[#E0721B] hover:opacity-95 text-white text-xs font-bold rounded-xl shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Pilih File CSV / Excel
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-          <input
-            type="file"
-            id="prospek-file-import"
-            accept=".csv,.xlsx,.xls"
-            onChange={handleImportFile}
-            className="hidden"
-          />
-          <button
-            onClick={() => document.getElementById('prospek-file-import')?.click()}
-            className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-[#F58220] to-[#E0721B] hover:opacity-95 text-white text-xs font-bold rounded-xl shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <FileSpreadsheet className="w-4 h-4" />
-            Pilih File CSV / Excel
-          </button>
+
+        {/* Total Leads Stats Card */}
+        <div className="bg-white dark:bg-[#1c1c1f] rounded-2xl border border-slate-100 dark:border-zinc-800 p-5 shadow-xs flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-orange-50 dark:bg-orange-950/20 rounded-xl shrink-0">
+              <Database className="w-5 h-5 text-[#F58220]" />
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-zinc-100">Total Data Leads</h3>
+              <p className="text-[10px] sm:text-xs text-slate-400 dark:text-zinc-500 mt-0.5">Semua data terinput</p>
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <span className="text-2xl md:text-3xl font-black text-[#F58220]">{leads.length}</span>
+            <span className="text-[9px] font-bold text-slate-400 dark:text-zinc-500 block uppercase tracking-wider">Leads</span>
+          </div>
         </div>
       </div>
       
@@ -639,9 +660,36 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
 
                       {/* Status */}
                       <td className="py-2.5 px-3 whitespace-nowrap">
-                        <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold border ${getStatusColorClasses(prospect.status).bg}`}>
-                          {prospect.status}
-                        </span>
+                        <select
+                          value={prospect.status}
+                          onChange={(e) => {
+                            const newStatus = e.target.value as FollowUpStatus;
+                            const todayStr = getTodayStr();
+                            const now = new Date();
+                            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                            
+                            const newHistoryEntry = {
+                              id: `hist-${Date.now()}-status-quick`,
+                              date: `${todayStr} ${timeStr}`,
+                              status: newStatus,
+                              pipeline: prospect.pipeline,
+                              notes: `Status diubah cepat dari tabel menjadi: ${newStatus}.`,
+                            };
+
+                            onUpdateLead({
+                              ...prospect,
+                              status: newStatus,
+                              history: [newHistoryEntry, ...prospect.history]
+                            });
+                          }}
+                          className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold border cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-200 dark:bg-zinc-900 ${getStatusColorClasses(prospect.status).bg}`}
+                        >
+                          {FOLLOW_UP_STATUSES.map(st => (
+                            <option key={st} value={st} className="bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 font-bold">
+                              {st}
+                            </option>
+                          ))}
+                        </select>
                       </td>
 
                       {/* Follow-up count & optional reminder */}

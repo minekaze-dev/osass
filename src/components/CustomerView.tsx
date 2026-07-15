@@ -98,9 +98,17 @@ export default function CustomerView({
     setEditingRow(null);
   };
 
+  // Filter to only actual customers (On Process, Closed, Installation, Refund)
+  const customerLeads = useMemo(() => {
+    return leads.filter(l => {
+      const status = l.closingStatus || (l.pipeline === 'Aktif' ? 'Closed' : 'Not Closed');
+      return status === 'On Process' || status === 'Closed' || status === 'Installation' || status === 'Refund';
+    });
+  }, [leads]);
+
   // Filter leads/customers
   const filteredLeads = useMemo(() => {
-    const filtered = leads.filter(l => {
+    const filtered = customerLeads.filter(l => {
       // Search
       const matchesSearch = 
         l.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -115,7 +123,7 @@ export default function CustomerView({
         (resolvedCustStatus === statusFilter);
 
       // Closing Filter (is closed / closing vs prospecting)
-      const isClosed = l.pipeline === 'Aktif' || !!l.closingDate;
+      const isClosed = l.pipeline === 'Aktif' || l.closingStatus === 'Closed' || !!l.closingDate;
       const matchesClosing = closingFilter === 'all' ||
         (closingFilter === 'closed' && isClosed) ||
         (closingFilter === 'open' && isLeadActiveProspect(l));
@@ -135,7 +143,7 @@ export default function CustomerView({
       const dateB = new Date(b.createdAt).getTime();
       return dateB - dateA;
     });
-  }, [leads, searchTerm, statusFilter, closingFilter, sourceFilter, dateFilter]);
+  }, [customerLeads, searchTerm, statusFilter, closingFilter, sourceFilter, dateFilter]);
 
   // Quick stats
   const stats = useMemo(() => {
@@ -145,8 +153,8 @@ export default function CustomerView({
     let dismantle = 0;
     let closedCount = 0;
 
-    leads.forEach(l => {
-      const isClosed = l.pipeline === 'Aktif' || !!l.closingDate;
+    customerLeads.forEach(l => {
+      const isClosed = l.pipeline === 'Aktif' || l.closingStatus === 'Closed' || !!l.closingDate;
       if (isClosed) closedCount++;
 
       totalCustomers++;
@@ -160,7 +168,7 @@ export default function CustomerView({
     });
 
     return { totalCustomers, active, refund, dismantle, closedCount };
-  }, [leads]);
+  }, [customerLeads]);
 
   return (
     <div className="space-y-6">
@@ -320,7 +328,7 @@ export default function CustomerView({
         {(searchTerm || statusFilter !== 'all' || closingFilter !== 'all' || dateFilter) && (
           <div className="flex justify-between items-center text-xs text-slate-500 bg-slate-50 p-2 rounded-xl border border-slate-100/60 mt-2">
             <span>
-              Menampilkan <span className="font-bold text-slate-700">{filteredLeads.length}</span> dari {leads.length} customer
+              Menampilkan <span className="font-bold text-slate-700">{filteredLeads.length}</span> dari {customerLeads.length} customer
               {dateFilter && (
                 <span> pada tanggal <span className="font-bold text-[#F58220]">{dateFilter}</span></span>
               )}
@@ -417,6 +425,8 @@ export default function CustomerView({
                           className={`px-1.5 py-1 border rounded-lg text-[10px] font-bold focus:outline-none focus:ring-1 focus:ring-orange-200 cursor-pointer ${
                             lead.closingStatus === 'Closed' || (!lead.closingStatus && isClosed)
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : lead.closingStatus === 'On Process'
+                              ? 'bg-blue-50 text-blue-600 border-blue-200'
                               : lead.closingStatus === 'Installation'
                               ? 'bg-amber-50 text-amber-600 border-amber-200'
                               : lead.closingStatus === 'Refund'
@@ -425,6 +435,7 @@ export default function CustomerView({
                           }`}
                         >
                           <option value="Not Closed" className="font-bold text-slate-600">Not Closed</option>
+                          <option value="On Process" className="font-bold text-blue-600">On Process</option>
                           <option value="Installation" className="font-bold text-amber-600">Installation</option>
                           <option value="Closed" className="font-bold text-emerald-700">Closed</option>
                           <option value="Refund" className="font-bold text-rose-600">Refund</option>
@@ -610,7 +621,7 @@ export default function CustomerView({
           </div>
           
           <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center text-xs text-slate-500 font-medium">
-            <span>Menampilkan {filteredLeads.length} dari total {leads.length} lead & customer</span>
+            <span>Menampilkan {filteredLeads.length} dari total {customerLeads.length} customer</span>
             <span className="flex items-center gap-1">
               <Award className="w-3.5 h-3.5 text-[#F58220]" />
               Oxygen WiFi Sales Assistant
