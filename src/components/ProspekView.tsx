@@ -577,9 +577,7 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
                   const mapQuery = encodeURIComponent(`${prospect.name} ${prospect.address} ${prospect.area}`);
                   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapQuery}`;
                   
-                  const waGreeting = `Halo ${prospect.name}, saya ${userName} dari WiFi Oxygen. `;
-                  const waTemplate = `Semoga sehat selalu Bapak/Bibu. Terkait layanan Oxygen WiFi rumahnya, apakah ada yang bisa kami bantu konfirmasi kembali?`;
-                  const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}&text=${encodeURIComponent(waTemplate)}`;
+                  const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}`;
 
                   // Helper to format date
                   const formatDate = (dateStr: string) => {

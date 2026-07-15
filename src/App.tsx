@@ -1207,7 +1207,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen ${config.theme === 'dark' ? 'bg-[#0f0f11] text-zinc-100 dark' : 'bg-[#F8FAFC] text-slate-800'}`}>
-      <div className={`flex w-full max-w-[1360px] mx-auto min-h-screen relative border-x shadow-sm transition-colors duration-200 ${
+      <div className={`flex w-full max-w-[1320px] mx-auto min-h-screen relative border-x shadow-sm transition-colors duration-200 ${
         config.theme === 'dark' ? 'bg-[#18181b] border-zinc-800 text-zinc-100' : 'bg-white border-slate-200/50 text-slate-800'
       }`}>
         

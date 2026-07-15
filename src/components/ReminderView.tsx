@@ -261,11 +261,7 @@ export default function ReminderView({ leads, onViewLead, onUpdateStatus, config
           {currentLeadsToShow.map((lead, idx) => {
             const safety = getSafetyBadge(lead);
             const waNumber = formatWhatsAppNumber(lead.whatsapp);
-            const waGreeting = `Halo ${lead.name}, saya ${userName} dari WiFi Oxygen. `;
-            const waTemplate = lead.status === 'Thinking'
-              ? `${waGreeting}Bagaimana kelanjutan pendaftaran WiFi Oxygen-nya kemarin Kak? Mumpung slot FAT masih free.`
-              : `${waGreeting}Kira-kira kapan kami bisa jadwalkan survey lokasi untuk pemasangan WiFi Oxygen di rumah Kakak?`;
-            const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}&text=${encodeURIComponent(waTemplate)}`;
+            const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}`;
             const daysSinceCreated = getDaysElapsed(lead.createdAt);
 
             return (

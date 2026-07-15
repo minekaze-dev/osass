@@ -4,10 +4,11 @@
  */
 
 import React from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, UserCheck, Bell, Award, CheckCircle, Check,
-  MessageSquare, ChevronRight, Calendar, AlertCircle, BarChart3, RefreshCw, TrendingUp
+  MessageSquare, ChevronRight, Calendar, AlertCircle, BarChart3, RefreshCw, TrendingUp,
+  FileSpreadsheet, Upload, Trash2, X, Plus, AlertTriangle
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -42,6 +43,70 @@ interface DashboardViewProps {
 
 export default function DashboardView({ leads, config, userName, onViewLead, onUpdateStatus, onQuickFollowUp }: DashboardViewProps) {
   const TODAY_STR = getTodayStr();
+
+  // State for manual daily performance overrides
+  const [manualOverrides, setManualOverrides] = React.useState<Record<string, { gp: number; paid: number; sa: number; refund: number }>>(() => {
+    try {
+      const saved = localStorage.getItem('oxygen_daily_overrides');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [isActivityModalOpen, setIsActivityModalOpen] = React.useState(false);
+
+  // Robust date string parser for imports
+  const parseImportedDate = React.useCallback((dateStr: string): string | null => {
+    if (!dateStr) return null;
+    dateStr = dateStr.trim();
+    
+    // Try YYYY-MM-DD first
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr;
+    }
+    
+    // Try D-M-YYYY or D/M/YYYY or D Month YYYY (e.g. 1 July 2026 or 1 Juli 2026)
+    const parts = dateStr.split(/[-/ ]+/);
+    if (parts.length === 3) {
+      let day = parseInt(parts[0]);
+      let monthStr = parts[1].toLowerCase();
+      let year = parseInt(parts[2]);
+      
+      // Check if parts[0] is year
+      if (parts[0].length === 4) {
+        year = parseInt(parts[0]);
+        monthStr = parts[1].toLowerCase();
+        day = parseInt(parts[2]);
+      }
+      
+      let month = -1;
+      if (/^\d+$/.test(monthStr)) {
+        month = parseInt(monthStr);
+      } else {
+        const monthNames = [
+          ['january', 'januari', 'jan'],
+          ['february', 'februari', 'feb'],
+          ['march', 'maret', 'mar'],
+          ['april', 'apr'],
+          ['may', 'mei'],
+          ['june', 'juni', 'jun'],
+          ['july', 'juli', 'jul'],
+          ['august', 'agustus', 'aug', 'agt'],
+          ['september', 'sep'],
+          ['october', 'oktober', 'oct', 'okt'],
+          ['november', 'nov'],
+          ['december', 'desember', 'dec', 'des']
+        ];
+        month = monthNames.findIndex(names => names.some(n => monthStr.includes(n))) + 1;
+      }
+      
+      if (day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 2000) {
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
+    }
+    return null;
+  }, []);
 
   // Helper to find the date of transition to 'General Payment' (GP)
   const getGPDate = React.useCallback((l: Lead): string | null => {
@@ -170,14 +235,6 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
     ).length;
   }, [leads]);
 
-  const monthlyClosings = React.useMemo(() => {
-    return leads.filter(l => {
-      const installedDate = getInstalledDate(l);
-      if (!installedDate) return false;
-      return selectedMonth === 'All' || installedDate.startsWith(selectedMonth);
-    }).length;
-  }, [leads, selectedMonth, getInstalledDate]);
-
   // Today's Tasks
   const todayTasks = React.useMemo(() => {
     return leads
@@ -193,22 +250,42 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
       });
   }, [leads]);
 
-  // Calculate target progress
-  // Calculate daily installations and incoming data for chart
+  // Calculate daily installations and incoming data for chart with de-duplication of SA
   const chartData = React.useMemo(() => {
     if (selectedMonth === 'All') return [];
     
     const [year, month] = selectedMonth.split('-').map(Number);
     const daysInMonth = new Date(year, month, 0).getDate();
     
-    const data = Array.from({ length: daysInMonth }, (_, i) => ({
-      day: i + 1,
-      installations: 0,
-      generalPayment: 0,
-      paid: 0,
-      aktif: 0,
-      incoming: 0
-    }));
+    // Calculate system SA per day for this month first
+    const systemSAByDay: Record<string, number> = {};
+    leads.forEach(l => {
+      const installedDate = getInstalledDate(l);
+      if (installedDate && installedDate.startsWith(selectedMonth)) {
+        systemSAByDay[installedDate] = (systemSAByDay[installedDate] || 0) + 1;
+      }
+    });
+
+    const data = Array.from({ length: daysInMonth }, (_, i) => {
+      const dayNum = i + 1;
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+      const manual = manualOverrides[dateStr] || { gp: 0, paid: 0, sa: 0, refund: 0 };
+      
+      const systemSA = systemSAByDay[dateStr] || 0;
+      // If there is SA from customer data (systemSA > 0), use that and don't count manual.sa (aktif = systemSA)
+      const finalSA = systemSA > 0 ? systemSA : (manual.sa || 0);
+
+      return {
+        day: dayNum,
+        dateStr,
+        installations: finalSA,
+        generalPayment: manual.gp,
+        paid: manual.paid,
+        aktif: finalSA,
+        refund: manual.refund,
+        incoming: 0
+      };
+    });
 
     leads.forEach(l => {
       // Calculate incoming leads strictly based on l.createdAt
@@ -237,51 +314,178 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
         }
       }
 
-      // 3. Installed transition date
-      const installedDate = getInstalledDate(l);
-      if (installedDate && installedDate.startsWith(selectedMonth)) {
-        const day = parseInt(installedDate.split('-')[2]);
-        if (day >= 1 && day <= daysInMonth) {
-          data[day - 1].aktif += 1;
-          data[day - 1].installations += 1;
-        }
-      }
+      // 3. Installed transition date is handled above during initialization of `data` to avoid double-counting
     });
 
     return data;
-  }, [leads, selectedMonth, getGPDate, getPaidDate, getInstalledDate]);
+  }, [leads, selectedMonth, manualOverrides, getGPDate, getPaidDate, getInstalledDate]);
 
   const stats = React.useMemo(() => {
-    const totalGP = leads.filter(l => {
+    // 1. System stats
+    const systemGP = leads.filter(l => {
       const gpDate = getGPDate(l);
       if (!gpDate) return false;
       return selectedMonth === 'All' || gpDate.startsWith(selectedMonth);
     }).length;
 
-    const totalPaid = leads.filter(l => {
+    const systemPaid = leads.filter(l => {
       const paidDate = getPaidDate(l);
       if (!paidDate) return false;
       return selectedMonth === 'All' || paidDate.startsWith(selectedMonth);
     }).length;
-    
-    const totalInstalled = leads.filter(l => {
-      const installedDate = getInstalledDate(l);
-      if (!installedDate) return false;
-      return selectedMonth === 'All' || installedDate.startsWith(selectedMonth);
-    }).length;
 
-    const todayInstalled = leads.filter(l => {
-      const installedDate = getInstalledDate(l);
-      return installedDate === TODAY_STR;
-    }).length;
+    // 2. Manual/Import stats sum
+    let manualGPSum = 0;
+    let manualPaidSum = 0;
+    let manualRefundSum = 0;
+
+    Object.entries(manualOverrides).forEach(([dateStr, rawVal]) => {
+      const val = rawVal as { gp?: number; paid?: number; sa?: number; refund?: number };
+      if (selectedMonth === 'All' || dateStr.startsWith(selectedMonth)) {
+        manualGPSum += val.gp || 0;
+        manualPaidSum += val.paid || 0;
+        manualRefundSum += val.refund || 0;
+      }
+    });
+
+    const totalGP = systemGP + manualGPSum;
+    const totalPaid = systemPaid + manualPaidSum;
+    const totalRefund = manualRefundSum;
+
+    // Calculate de-duplicated SA (Installed) sum
+    let totalInstalled = 0;
+    let todayInstalled = 0;
+
+    if (selectedMonth === 'All') {
+      const systemSAByDate: Record<string, number> = {};
+      leads.forEach(l => {
+        const instDate = getInstalledDate(l);
+        if (instDate) {
+          systemSAByDate[instDate] = (systemSAByDate[instDate] || 0) + 1;
+        }
+      });
+
+      const allDates = new Set<string>([
+        ...Object.keys(systemSAByDate),
+        ...Object.keys(manualOverrides)
+      ]);
+
+      allDates.forEach(dateStr => {
+        const systemSA = systemSAByDate[dateStr] || 0;
+        const manual = (manualOverrides[dateStr] as { sa?: number })?.sa || 0;
+        const finalSA = systemSA > 0 ? systemSA : manual;
+        totalInstalled += finalSA;
+        if (dateStr === TODAY_STR) {
+          todayInstalled += finalSA;
+        }
+      });
+    } else {
+      const [year, month] = selectedMonth.split('-').map(Number);
+      const daysInMonth = new Date(year, month, 0).getDate();
+
+      const systemSAByDate: Record<string, number> = {};
+      leads.forEach(l => {
+        const instDate = getInstalledDate(l);
+        if (instDate && instDate.startsWith(selectedMonth)) {
+          systemSAByDate[instDate] = (systemSAByDate[instDate] || 0) + 1;
+        }
+      });
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const systemSA = systemSAByDate[dateStr] || 0;
+        const manual = (manualOverrides[dateStr] as { sa?: number })?.sa || 0;
+        const finalSA = systemSA > 0 ? systemSA : manual;
+        totalInstalled += finalSA;
+        if (dateStr === TODAY_STR) {
+          todayInstalled += finalSA;
+        }
+      }
+    }
 
     const totalIncoming = leads.filter(l => selectedMonth === 'All' || l.createdAt.startsWith(selectedMonth)).length;
     const todayIncoming = leads.filter(l => l.createdAt.startsWith(TODAY_STR)).length;
 
-    return { totalGP, totalPaid, totalInstalled, todayInstalled, totalIncoming, todayIncoming };
-  }, [leads, selectedMonth, TODAY_STR, getGPDate, getPaidDate, getInstalledDate]);
+    return { 
+      totalGP, 
+      totalPaid, 
+      totalInstalled, 
+      totalRefund, 
+      todayInstalled, 
+      totalIncoming, 
+      todayIncoming 
+    };
+  }, [leads, selectedMonth, TODAY_STR, manualOverrides, getGPDate, getPaidDate, getInstalledDate]);
+
+  const monthlyClosings = stats.totalInstalled;
 
   const targetProgress = Math.min(100, Math.round((monthlyClosings / config.monthlyTarget) * 100));
+
+  // Local state for edits in the modal
+  const [tempOverrides, setTempOverrides] = React.useState<Record<string, { gp: number; paid: number; sa: number; refund: number }>>({});
+  const [activeModalTab, setActiveModalTab] = React.useState<'manual' | 'import'>('manual');
+  const [pasteText, setPasteText] = React.useState('');
+
+  // Populate tempOverrides when modal opens
+  React.useEffect(() => {
+    if (isActivityModalOpen) {
+      setTempOverrides({ ...manualOverrides });
+      setPasteText('');
+    }
+  }, [isActivityModalOpen, manualOverrides]);
+
+  // Days list for selected month
+  const daysOfSelectedMonth = React.useMemo(() => {
+    if (!selectedMonth || selectedMonth === 'All') return [];
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const dayNum = i + 1;
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
+      return {
+        day: dayNum,
+        dateStr,
+        formattedLabel: `${dayNum} ${formatMonthYear(selectedMonth)}`
+      };
+    });
+  }, [selectedMonth]);
+
+  // Calculated system totals for days of selected month
+  const systemTotalsByDay = React.useMemo(() => {
+    const totals: Record<string, { gp: number; paid: number; sa: number }> = {};
+    if (!selectedMonth || selectedMonth === 'All') return totals;
+
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      totals[dateStr] = { gp: 0, paid: 0, sa: 0 };
+    }
+
+    leads.forEach(l => {
+      // 1. General Payment
+      const gpDate = getGPDate(l);
+      if (gpDate && gpDate.startsWith(selectedMonth)) {
+        if (totals[gpDate]) totals[gpDate].gp += 1;
+      }
+
+      // 2. Paid
+      const paidDate = getPaidDate(l);
+      if (paidDate && paidDate.startsWith(selectedMonth)) {
+        if (totals[paidDate]) totals[paidDate].paid += 1;
+      }
+
+      // 3. SA / Installation
+      const installedDate = getInstalledDate(l);
+      if (installedDate && installedDate.startsWith(selectedMonth)) {
+        if (totals[installedDate]) totals[installedDate].sa += 1;
+      }
+    });
+
+    return totals;
+  }, [leads, selectedMonth, getGPDate, getPaidDate, getInstalledDate]);
 
   const getFollowUpDayText = (lead: Lead): string => {
     const days = getDaysElapsed(lead.createdAt);
@@ -423,33 +627,53 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
           {/* Daily Performance Chart */}
           <div className={`p-5 rounded-2xl border shadow-xs ${config.theme === 'dark' ? 'bg-[#18181b] border-zinc-800' : 'bg-white border-slate-100'}`}>
             <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
-              <div className="flex items-center gap-2">
-                <div className={`p-2 rounded-lg ${config.theme === 'dark' ? 'bg-orange-500/10 text-orange-500' : 'bg-orange-50 text-[#F58220]'}`}>
-                  <BarChart3 className="w-5 h-5" />
+              <div className="flex flex-wrap items-center justify-between xl:justify-start gap-4 w-full xl:w-auto">
+                <div className="flex items-center gap-2">
+                  <div className={`p-2 rounded-lg ${config.theme === 'dark' ? 'bg-orange-500/10 text-orange-500' : 'bg-orange-50 text-[#F58220]'}`}>
+                    <BarChart3 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className={`text-sm font-bold whitespace-nowrap ${config.theme === 'dark' ? 'text-zinc-100' : 'text-slate-800'}`}>
+                      Grafik Aktivitas Harian
+                    </h3>
+                    <p className={`text-[10px] ${config.theme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>
+                      Performa harian periode {formatMonthYear(selectedMonth)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className={`text-sm font-bold whitespace-nowrap ${config.theme === 'dark' ? 'text-zinc-100' : 'text-slate-800'}`}>
-                    Grafik Aktivitas Harian
-                  </h3>
-                  <p className={`text-[10px] ${config.theme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>
-                    Performa harian periode {formatMonthYear(selectedMonth)}
-                  </p>
-                </div>
+
+                <button
+                  onClick={() => setIsActivityModalOpen(true)}
+                  className={`px-2.5 py-1.5 rounded-xl font-bold text-[11px] flex items-center gap-1.5 cursor-pointer transition-colors ${
+                    config.theme === 'dark' 
+                      ? 'bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 border border-orange-500/20' 
+                      : 'bg-orange-50 text-[#F58220] hover:bg-orange-100 border border-orange-200'
+                  }`}
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  Input Manual / Import CSV
+                </button>
               </div>
               
-              <div className="flex flex-nowrap gap-1 md:gap-1.5 select-none items-center">
-                <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[50px] md:min-w-[55px] ${config.theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>TOTAL GP</span>
+              <div className="flex flex-nowrap gap-1 md:gap-1.5 select-none items-center xl:self-center justify-start sm:justify-end">
+                <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[35px] sm:min-w-[45px] ${config.theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
+                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>GP</span>
                   <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-blue-100' : 'text-blue-700'}`}>{stats.totalGP}</span>
                 </div>
-                <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[55px] md:min-w-[65px] ${config.theme === 'dark' ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
-                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>TOTAL PAID</span>
+                <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[35px] sm:min-w-[45px] ${config.theme === 'dark' ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
+                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>P</span>
                   <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-indigo-100' : 'text-indigo-700'}`}>{stats.totalPaid}</span>
                 </div>
-                <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[80px] md:min-w-[95px] border border-emerald-500/20 ${config.theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>PEMASANGAN</span>
-                  <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-emerald-100' : 'text-emerald-700'}`}>{stats.todayInstalled}</span>
+                <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[35px] sm:min-w-[45px] border border-emerald-500/20 ${config.theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>PS</span>
+                  <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-emerald-100' : 'text-emerald-700'}`}>{stats.totalInstalled}</span>
                 </div>
+                {stats.totalRefund > 0 && (
+                  <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[35px] sm:min-w-[45px] border border-red-500/20 ${config.theme === 'dark' ? 'bg-red-500/10' : 'bg-red-50'}`}>
+                    <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>RF</span>
+                    <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-red-100' : 'text-red-700'}`}>{stats.totalRefund}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -498,6 +722,12 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                               <span className="text-[#F58220]">Instalasi:</span>
                               <span className="font-bold">{d.aktif}</span>
                             </p>
+                            {d.refund > 0 && (
+                              <p className="flex justify-between gap-4 text-red-500 font-semibold">
+                                <span>Refund:</span>
+                                <span>{d.refund}</span>
+                              </p>
+                            )}
                           </div>
                         );
                       }
@@ -506,7 +736,8 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                   />
                   <Bar dataKey="generalPayment" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={14} />
                   <Bar dataKey="paid" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} barSize={14} />
-                  <Bar dataKey="aktif" stackId="a" fill="#F58220" radius={[4, 4, 0, 0]} barSize={14} />
+                  <Bar dataKey="aktif" stackId="a" fill="#F58220" radius={[0, 0, 0, 0]} barSize={14} />
+                  <Bar dataKey="refund" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={14} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -633,14 +864,7 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                 <tbody className={`divide-y text-xs ${config.theme === 'dark' ? 'divide-zinc-800 text-zinc-300' : 'divide-slate-100 text-slate-700'}`}>
                   {todayTasks.map((task, index) => {
                     const waNumber = formatWhatsAppNumber(task.whatsapp);
-                    const waGreeting = `Halo ${task.name}, saya ${userName} dari WiFi Oxygen. `;
-                    const waTemplate = task.status === 'Thinking' 
-                      ? `${waGreeting}Bagaimana kelanjutan pendaftaran WiFi Oxygen kemarin Pak/Bu? Apakah jadi diambil promo bebas instalasinya?`
-                      : task.status === 'NBP'
-                      ? `${waGreeting}Mohon maaf mengganggu waktunya Pak/Bu. Brosur Oxygen kemarin apakah ada yang ingin ditanyakan lebih lanjut?`
-                      : `${waGreeting}Ingin menanyakan kabar pendaftaran internet Oxygen untuk rumah Bapak/Ibu. Apakah sudah bisa kita jadwalkan survey titik tiangnya?`;
-                    
-                    const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}&text=${encodeURIComponent(waTemplate)}`;
+                    const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}`;
                     const isOverdue = task.nextReminderDate && task.nextReminderDate < TODAY_STR;
 
                     return (
@@ -757,6 +981,414 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
           <p className="text-xs text-white/80">Kabel fiber optik Oxygen menawarkan download dan upload 1:1 simetris. Sangat cocok untuk livestreamer, gamer, dan WFH!</p>
         </div>
       </div>
+
+      {/* Activity Management & Spreadsheet Import Modal */}
+      <AnimatePresence>
+        {isActivityModalOpen && selectedMonth !== 'All' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsActivityModalOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            />
+
+            {/* Modal Container */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className={`relative w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl border shadow-2xl flex flex-col ${
+                config.theme === 'dark' ? 'bg-[#1c1c1e] border-zinc-850 text-zinc-100' : 'bg-white border-slate-100 text-slate-800'
+              }`}
+            >
+              {/* Modal Header */}
+              <div className={`p-5 border-b flex items-center justify-between ${
+                config.theme === 'dark' ? 'border-zinc-800/80 bg-zinc-900/30' : 'border-slate-100 bg-slate-50/50'
+              }`}>
+                <div>
+                  <h2 className="text-base font-bold flex items-center gap-2">
+                    <FileSpreadsheet className="w-5 h-5 text-orange-500" />
+                    Kelola Grafik Aktivitas Harian ({formatMonthYear(selectedMonth)})
+                  </h2>
+                  <p className={`text-[11px] mt-0.5 ${config.theme === 'dark' ? 'text-zinc-400' : 'text-slate-500'}`}>
+                    Tambahkan data manual harian atau import langsung dari CSV / file Excel copy-paste.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsActivityModalOpen(false)}
+                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                    config.theme === 'dark' ? 'hover:bg-zinc-800 text-zinc-400' : 'hover:bg-slate-100 text-slate-400'
+                  }`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Tabs navigation */}
+              <div className={`flex border-b px-5 ${
+                config.theme === 'dark' ? 'border-zinc-800/80' : 'border-slate-100'
+              }`}>
+                <button
+                  onClick={() => setActiveModalTab('manual')}
+                  className={`py-3 px-4 font-bold text-xs border-b-2 transition-colors cursor-pointer ${
+                    activeModalTab === 'manual'
+                      ? 'border-[#F58220] text-[#F58220]'
+                      : 'border-transparent text-slate-400 hover:text-slate-500'
+                  }`}
+                >
+                  Input Manual & Edit Tabel
+                </button>
+                <button
+                  onClick={() => setActiveModalTab('import')}
+                  className={`py-3 px-4 font-bold text-xs border-b-2 transition-colors cursor-pointer ${
+                    activeModalTab === 'import'
+                      ? 'border-[#F58220] text-[#F58220]'
+                      : 'border-transparent text-slate-400 hover:text-slate-500'
+                  }`}
+                >
+                  Import CSV / Paste Excel
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4">
+                {activeModalTab === 'manual' ? (
+                  <div className="space-y-3">
+                    <div className={`p-3 rounded-xl border flex items-start gap-2.5 ${
+                      config.theme === 'dark' ? 'bg-orange-500/5 border-orange-500/10 text-orange-300' : 'bg-orange-50/50 border-orange-100 text-orange-800'
+                    }`}>
+                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <p className="text-[11px] leading-relaxed">
+                        Input di bawah ini adalah <strong>tambahan manual</strong>. Sistem akan menjumlahkannya secara otomatis dengan data aktif (leads) yang terdaftar sesuai tanggal transisinya.
+                      </p>
+                    </div>
+
+                    <div className={`rounded-xl border overflow-hidden ${
+                      config.theme === 'dark' ? 'border-zinc-800 bg-zinc-900/10' : 'border-slate-150 bg-white'
+                    }`}>
+                      <div className="max-h-[42vh] overflow-y-auto overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead className={`sticky top-0 z-10 ${
+                            config.theme === 'dark' ? 'bg-zinc-900 text-zinc-400 border-b border-zinc-800' : 'bg-slate-50 text-slate-500 border-b border-slate-100'
+                          }`}>
+                            <tr>
+                              <th className="py-2 px-3 font-bold">Tanggal</th>
+                              <th className="py-2 px-3 font-bold">Sistem (Otomatis)</th>
+                              <th className="py-2 px-2 text-center font-bold">GP Manual</th>
+                              <th className="py-2 px-2 text-center font-bold">PAID Manual</th>
+                              <th className="py-2 px-2 text-center font-bold">SA Manual</th>
+                              <th className="py-2 px-2 text-center font-bold">REFUND</th>
+                              <th className="py-2 px-3 text-right font-bold">Total Day</th>
+                            </tr>
+                          </thead>
+                          <tbody className={`divide-y ${config.theme === 'dark' ? 'divide-zinc-800/80 text-zinc-300' : 'divide-slate-100 text-slate-600'}`}>
+                            {daysOfSelectedMonth.map(item => {
+                              const system = systemTotalsByDay[item.dateStr] || { gp: 0, paid: 0, sa: 0 };
+                              const temp = tempOverrides[item.dateStr] || { gp: 0, paid: 0, sa: 0, refund: 0 };
+
+                              const finalGP = system.gp + temp.gp;
+                              const finalPaid = system.paid + temp.paid;
+                              const finalSA = system.sa + temp.sa;
+                              const finalRefund = temp.refund;
+
+                              const updateTempField = (field: 'gp' | 'paid' | 'sa' | 'refund', valStr: string) => {
+                                const val = parseInt(valStr) || 0;
+                                setTempOverrides(prev => ({
+                                  ...prev,
+                                  [item.dateStr]: {
+                                    ...(prev[item.dateStr] || { gp: 0, paid: 0, sa: 0, refund: 0 }),
+                                    [field]: val
+                                  }
+                                }));
+                              };
+
+                              return (
+                                <tr key={item.dateStr} className={`transition-colors ${
+                                  config.theme === 'dark' ? 'hover:bg-zinc-800/20' : 'hover:bg-slate-50/50'
+                                }`}>
+                                  <td className="py-2 px-3 font-bold whitespace-nowrap">
+                                    {item.day} {formatMonthYear(selectedMonth)}
+                                  </td>
+                                  <td className="py-2 px-3">
+                                    <div className="flex flex-wrap gap-1">
+                                      {system.gp > 0 && (
+                                        <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-500 rounded-md text-[9px] font-bold">
+                                          GP:{system.gp}
+                                        </span>
+                                      )}
+                                      {system.paid > 0 && (
+                                        <span className="px-1.5 py-0.5 bg-indigo-500/10 text-indigo-500 rounded-md text-[9px] font-bold">
+                                          PAID:{system.paid}
+                                        </span>
+                                      )}
+                                      {system.sa > 0 && (
+                                        <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-500 rounded-md text-[9px] font-bold">
+                                          SA:{system.sa}
+                                        </span>
+                                      )}
+                                      {system.gp === 0 && system.paid === 0 && system.sa === 0 && (
+                                        <span className="text-[10px] text-slate-400 italic">0 aktivitas</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="py-1 px-2 text-center">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={temp.gp || ''}
+                                      placeholder="0"
+                                      onChange={e => updateTempField('gp', e.target.value)}
+                                      className={`w-14 px-1.5 py-1 text-center rounded-lg border text-xs font-bold transition-all bg-transparent focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-hidden ${
+                                        config.theme === 'dark' ? 'border-zinc-700 text-zinc-100' : 'border-slate-200 text-slate-800'
+                                      }`}
+                                    />
+                                  </td>
+                                  <td className="py-1 px-2 text-center">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={temp.paid || ''}
+                                      placeholder="0"
+                                      onChange={e => updateTempField('paid', e.target.value)}
+                                      className={`w-14 px-1.5 py-1 text-center rounded-lg border text-xs font-bold transition-all bg-transparent focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-hidden ${
+                                        config.theme === 'dark' ? 'border-zinc-700 text-zinc-100' : 'border-slate-200 text-slate-800'
+                                      }`}
+                                    />
+                                  </td>
+                                  <td className="py-1 px-2 text-center">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={temp.sa || ''}
+                                      placeholder="0"
+                                      onChange={e => updateTempField('sa', e.target.value)}
+                                      className={`w-14 px-1.5 py-1 text-center rounded-lg border text-xs font-bold transition-all bg-transparent focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-hidden ${
+                                        config.theme === 'dark' ? 'border-zinc-700 text-zinc-100' : 'border-slate-200 text-slate-800'
+                                      }`}
+                                    />
+                                  </td>
+                                  <td className="py-1 px-2 text-center">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={temp.refund || ''}
+                                      placeholder="0"
+                                      onChange={e => updateTempField('refund', e.target.value)}
+                                      className={`w-14 px-1.5 py-1 text-center rounded-lg border text-xs font-bold transition-all bg-transparent focus:ring-1 focus:ring-orange-500 focus:border-orange-500 outline-hidden ${
+                                        config.theme === 'dark' ? 'border-zinc-700 text-zinc-100' : 'border-slate-200 text-slate-800'
+                                      }`}
+                                    />
+                                  </td>
+                                  <td className="py-2 px-3 text-right font-mono font-bold whitespace-nowrap">
+                                    <div className="flex flex-col items-end">
+                                      <span className={config.theme === 'dark' ? 'text-zinc-200' : 'text-slate-800'}>
+                                        GP:{finalGP} | PAID:{finalPaid} | SA:{finalSA}
+                                      </span>
+                                      {finalRefund > 0 && (
+                                        <span className="text-red-500 text-[10px]">
+                                          Refund: {finalRefund}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className={`p-4 rounded-xl border space-y-2 ${
+                      config.theme === 'dark' ? 'bg-zinc-900/50 border-zinc-800 text-zinc-300' : 'bg-slate-50/50 border-slate-150 text-slate-700'
+                    }`}>
+                      <h4 className="font-bold text-xs uppercase tracking-wide text-orange-500">Petunjuk Format Berkas / Paste</h4>
+                      <p className="text-[11px] leading-relaxed">
+                        Gunakan file CSV atau salin sel langsung dari file Excel/Spreadsheet Anda. Format kolom wajib terdiri dari 5 kolom berurutan:
+                      </p>
+                      <div className="p-2.5 rounded-lg bg-black/5 dark:bg-black/20 font-mono text-[10px] space-y-1">
+                        <p className="text-[#F58220] font-bold">Tanggal, GP, PAID, SA, REFUND</p>
+                        <p className="text-slate-400">1 July 2026, 4, 2, 0, 0</p>
+                        <p className="text-slate-400">2 July 2026, 0, 1, 1, 0</p>
+                        <p className="text-slate-400">3 July 2026, 2, 0, 3, 1</p>
+                      </div>
+                      <p className="text-[10px] text-slate-400 italic">
+                        * Format Tanggal didukung: "1 Juli 2026", "2026-07-01", "1 July 2026", "1-7-2026", "1/7/2026".
+                      </p>
+                    </div>
+
+                    {/* File Upload Box */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className={`p-5 rounded-xl border border-dashed flex flex-col items-center justify-center text-center p-6 transition-all ${
+                        config.theme === 'dark' ? 'bg-zinc-900/30 border-zinc-800 hover:border-zinc-700' : 'bg-slate-50/30 border-slate-200 hover:border-slate-300'
+                      }`}>
+                        <Upload className="w-8 h-8 text-slate-400 mb-2 animate-bounce-slow" />
+                        <span className="text-xs font-bold block mb-1">Unggah File CSV / TXT</span>
+                        <span className="text-[10px] text-slate-400 mb-4 block">Pilih file berformat CSV (.csv) atau Teks (.txt)</span>
+                        <label className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-xl cursor-pointer transition-colors shadow-xs">
+                          Pilih Berkas
+                          <input
+                            type="file"
+                            accept=".csv,.txt"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = (evt) => {
+                                const text = evt.target?.result;
+                                if (typeof text === 'string') {
+                                  processImportText(text);
+                                }
+                              };
+                              reader.readAsText(file);
+                            }}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+
+                      {/* Paste spreadsheet Area */}
+                      <div className="flex flex-col space-y-1.5">
+                        <span className="text-xs font-bold block">Salin & Tempel (Copy-Paste) Sel Excel di Sini:</span>
+                        <textarea
+                          rows={6}
+                          value={pasteText}
+                          onChange={(e) => setPasteText(e.target.value)}
+                          placeholder="Pilih sel di Excel Anda, salin (Ctrl+C), lalu tempel (Ctrl+V) di sini..."
+                          className={`flex-1 p-3 rounded-xl border text-xs font-mono outline-hidden focus:ring-1 focus:ring-orange-500 focus:border-orange-500 ${
+                            config.theme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-zinc-100 placeholder-zinc-600' : 'bg-white border-slate-200 text-slate-800 placeholder-slate-400'
+                          }`}
+                        />
+                        <button
+                          onClick={() => {
+                            if (!pasteText.trim()) {
+                              alert('Silakan tempel teks Excel terlebih dahulu!');
+                              return;
+                            }
+                            processImportText(pasteText);
+                          }}
+                          className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-xl cursor-pointer transition-colors shadow-xs flex items-center justify-center gap-1.5"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                          Proses Data Hasil Tempelan
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className={`p-4 border-t flex flex-wrap items-center justify-between gap-3 ${
+                config.theme === 'dark' ? 'border-zinc-800 bg-zinc-900/30' : 'border-slate-100 bg-slate-50/50'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (confirm('Apakah Anda yakin ingin menghapus seluruh data manual untuk periode bulan ini?')) {
+                        // Build a clean override list excluding current month
+                        const newOverrides = { ...manualOverrides };
+                        Object.keys(newOverrides).forEach(key => {
+                          if (key.startsWith(selectedMonth)) {
+                            delete newOverrides[key];
+                          }
+                        });
+                        setTempOverrides(newOverrides);
+                        setManualOverrides(newOverrides);
+                        localStorage.setItem('oxygen_daily_overrides', JSON.stringify(newOverrides));
+                        setIsActivityModalOpen(false);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 text-red-500 hover:bg-red-500/10 cursor-pointer transition-colors`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Reset Bulan Ini
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsActivityModalOpen(false)}
+                    className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                      config.theme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                    }`}
+                  >
+                    Batal
+                  </button>
+                  <button
+                    onClick={() => {
+                      setManualOverrides(tempOverrides);
+                      localStorage.setItem('oxygen_daily_overrides', JSON.stringify(tempOverrides));
+                      setIsActivityModalOpen(false);
+                    }}
+                    className="px-5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-xl cursor-pointer transition-colors shadow-xs flex items-center gap-1.5"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    Simpan Perubahan
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
+
+  // Helper inside modal to parse text input (either CSV file load or Spreadsheet Paste area)
+  function processImportText(text: string) {
+    const lines = text.split(/\r?\n/);
+    const newOverrides = { ...tempOverrides };
+    let importedCount = 0;
+    let skippedCount = 0;
+
+    lines.forEach((line) => {
+      const cleanLine = line.trim();
+      if (!cleanLine) return;
+
+      // Handle split by tab, comma, or semicolon
+      const cells = cleanLine.split(/[\t,;]+/);
+      if (cells.length < 2) return;
+
+      // Skip table header
+      const firstCellLower = cells[0].toLowerCase();
+      if (
+        firstCellLower.includes('tanggal') || 
+        firstCellLower.includes('date') || 
+        firstCellLower.includes('gp') || 
+        firstCellLower.includes('paid')
+      ) {
+        return;
+      }
+
+      const rawDate = cells[0].trim();
+      const dateStr = parseImportedDate(rawDate);
+
+      if (dateStr) {
+        // Must follow: Tanggal, GP, PAID, SA, REFUND
+        const gp = parseInt(cells[1]) || 0;
+        const paid = parseInt(cells[2]) || 0;
+        const sa = parseInt(cells[3]) || 0;
+        const refund = parseInt(cells[4]) || 0;
+
+        newOverrides[dateStr] = { gp, paid, sa, refund };
+        importedCount++;
+      } else {
+        skippedCount++;
+      }
+    });
+
+    if (importedCount > 0) {
+      setTempOverrides(newOverrides);
+      setActiveModalTab('manual');
+      alert(`Berhasil membaca ${importedCount} baris data harian. Silakan periksa kembali nilainya pada tabel, lalu klik tombol "Simpan Perubahan" di bagian kanan bawah.`);
+    } else {
+      alert(`Format tidak dikenali. Pastikan data yang dimasukkan memiliki urutan kolom: Tanggal, GP, PAID, SA, REFUND.`);
+    }
+  }
 }

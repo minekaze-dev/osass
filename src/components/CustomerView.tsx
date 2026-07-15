@@ -373,8 +373,7 @@ export default function CustomerView({
                   const resolvedCustStatus = lead.customerStatus || (lead.pipeline === 'Aktif' ? 'Aktif' : 'Follow Up');
                   
                   const waNumber = formatWhatsAppNumber(lead.whatsapp);
-                  const waTemplate = `Halo ${lead.name}, saya ${userName} dari WiFi Oxygen. Terkait paket internet ${lead.packageInterest} yang Bapak/Ibu gunakan saat ini, apakah layanannya berjalan dengan lancar?`;
-                  const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}&text=${encodeURIComponent(waTemplate)}`;
+                  const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}`;
 
                   return (
                     <motion.tr

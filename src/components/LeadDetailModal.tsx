@@ -32,15 +32,7 @@ export default function LeadDetailModal({ lead, isOpen, onClose, onUpdateStatus,
   const mapQuery = encodeURIComponent(`${lead.name} ${lead.address} ${lead.area}`);
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapQuery}`;
   
-  // Custom template for WhatsApp follow up
-  const waGreeting = `Halo ${lead.name}, saya ${lead.source.includes('Qiscus') ? 'Asisten Oxygen' : 'Andi'} dari WiFi Oxygen. `;
-  const waTemplate = lead.status === 'Thinking' 
-    ? `${waGreeting}Bagaimana kelanjutan rencana pemasangan WiFi Oxygen di rumah Bapak/Ibu? Mumpung masih ada promo bebas biaya instalasi lho.`
-    : lead.status === 'NBP'
-    ? `${waGreeting}Apakah brosur paket internet Oxygen yang kemarin saya kirimkan sudah sempat dibaca? Jika ada pertanyaan mengenai instalasi, silakan tanyakan ya.`
-    : `${waGreeting}Semoga dalam keadaan sehat. Saya ingin mengonfirmasi kelanjutan pendaftaran layanan Oxygen untuk paket ${lead.packageInterest}. Apakah berkasnya bisa kami bantu proses?`;
-  
-  const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}&text=${encodeURIComponent(waTemplate)}`;
+  const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}`;
 
   return (
     <AnimatePresence>
