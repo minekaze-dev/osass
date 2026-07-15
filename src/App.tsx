@@ -249,6 +249,7 @@ export default function App() {
                 console.warn("Active user session not found in Supabase. Logging out.");
                 setAuth({ user: null, isAuthenticated: false });
                 localStorage.removeItem('oxygen_auth');
+                window.location.replace('/');
               } else {
                 setAuth({ user: stillExists, isAuthenticated: true });
                 localStorage.setItem('oxygen_auth', JSON.stringify({ user: stillExists, isAuthenticated: true }));
@@ -678,7 +679,8 @@ export default function App() {
   const handleLogout = () => {
     setAuth({ user: null, isAuthenticated: false });
     localStorage.removeItem('oxygen_auth');
-    setActiveTab('dashboard');
+    // Force a full reload to clear browser history/cache for the authenticated state
+    window.location.replace('/');
   };
 
   // Admin Handlers

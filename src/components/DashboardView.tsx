@@ -278,10 +278,9 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
       return {
         day: dayNum,
         dateStr,
-        installations: finalSA,
         generalPayment: manual.gp,
         paid: manual.paid,
-        aktif: finalSA,
+        sa: finalSA,
         refund: manual.refund,
         incoming: 0
       };
@@ -351,6 +350,15 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
     const totalGP = systemGP + manualGPSum;
     const totalPaid = systemPaid + manualPaidSum;
     const totalRefund = manualRefundSum;
+    
+    // Calculate total SA manual sum
+    let totalSAManual = 0;
+    Object.entries(manualOverrides).forEach(([dateStr, rawVal]) => {
+      const val = rawVal as { sa?: number };
+      if (selectedMonth === 'All' || dateStr.startsWith(selectedMonth)) {
+        totalSAManual += val.sa || 0;
+      }
+    });
 
     // Calculate de-duplicated SA (Installed) sum
     let totalInstalled = 0;
@@ -410,6 +418,7 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
       totalGP, 
       totalPaid, 
       totalInstalled, 
+      totalSAManual,
       totalRefund, 
       todayInstalled, 
       totalIncoming, 
@@ -417,7 +426,7 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
     };
   }, [leads, selectedMonth, TODAY_STR, manualOverrides, getGPDate, getPaidDate, getInstalledDate]);
 
-  const monthlyClosings = stats.totalInstalled;
+  const monthlyClosings = stats.totalSAManual;
 
   const targetProgress = Math.min(100, Math.round((monthlyClosings / config.monthlyTarget) * 100));
 
@@ -645,20 +654,20 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
               
               <div className="flex flex-nowrap gap-1 md:gap-1.5 select-none items-center xl:self-center justify-start sm:justify-end">
                 <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[35px] sm:min-w-[45px] ${config.theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>GP</span>
+                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>General Payment</span>
                   <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-blue-100' : 'text-blue-700'}`}>{stats.totalGP}</span>
                 </div>
                 <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[35px] sm:min-w-[45px] ${config.theme === 'dark' ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
-                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>P</span>
+                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>Paid</span>
                   <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-indigo-100' : 'text-indigo-700'}`}>{stats.totalPaid}</span>
                 </div>
                 <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[35px] sm:min-w-[45px] border border-emerald-500/20 ${config.theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>PS</span>
-                  <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-emerald-100' : 'text-emerald-700'}`}>{stats.totalInstalled}</span>
+                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>SA</span>
+                  <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-emerald-100' : 'text-emerald-700'}`}>{stats.totalSAManual}</span>
                 </div>
                 {stats.totalRefund > 0 && (
                   <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[35px] sm:min-w-[45px] border border-red-500/20 ${config.theme === 'dark' ? 'bg-red-500/10' : 'bg-red-50'}`}>
-                    <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>RF</span>
+                    <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>Refund</span>
                     <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-red-100' : 'text-red-700'}`}>{stats.totalRefund}</span>
                   </div>
                 )}
@@ -707,8 +716,8 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                               <span className="font-bold">{d.paid}</span>
                             </p>
                             <p className="flex justify-between gap-4 border-t pt-1 mt-1 border-slate-50 dark:border-zinc-800/50">
-                              <span className="text-[#F58220]">Instalasi:</span>
-                              <span className="font-bold">{d.aktif}</span>
+                              <span className="text-[#F58220]">SA:</span>
+                              <span className="font-bold">{d.sa}</span>
                             </p>
                             {d.refund > 0 && (
                               <p className="flex justify-between gap-4 text-red-500 font-semibold">
@@ -724,7 +733,7 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                   />
                   <Bar dataKey="generalPayment" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={14} />
                   <Bar dataKey="paid" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} barSize={14} />
-                  <Bar dataKey="aktif" stackId="a" fill="#F58220" radius={[0, 0, 0, 0]} barSize={14} />
+                  <Bar dataKey="sa" stackId="a" fill="#F58220" radius={[0, 0, 0, 0]} barSize={14} />
                   <Bar dataKey="refund" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={14} />
                 </BarChart>
               </ResponsiveContainer>
@@ -768,7 +777,7 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                   <span className={`text-xs font-black ${config.theme === 'dark' ? 'text-emerald-100' : 'text-emerald-700'}`}>{stats.totalIncoming}</span>
                 </div>
                 <div className={`px-2 py-1 rounded-lg flex flex-col items-center justify-center min-w-[75px] border border-orange-500/20 ${config.theme === 'dark' ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
-                  <span className={`text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`}>MASUK HARI INI</span>
+                  <span className={`text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`}>DATA HARI INI</span>
                   <span className={`text-xs font-black ${config.theme === 'dark' ? 'text-orange-100' : 'text-orange-700'}`}>{stats.todayIncoming}</span>
                 </div>
               </div>
@@ -1078,7 +1087,6 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                           }`}>
                             <tr>
                               <th className="py-2 px-3 font-bold">Tanggal</th>
-                              <th className="py-2 px-3 font-bold">Sistem (Otomatis)</th>
                               <th className="py-2 px-2 text-center font-bold">GP Manual</th>
                               <th className="py-2 px-2 text-center font-bold">PAID Manual</th>
                               <th className="py-2 px-2 text-center font-bold">SA Manual</th>
@@ -1113,28 +1121,6 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                                 }`}>
                                   <td className="py-2 px-3 font-bold whitespace-nowrap">
                                     {item.day} {formatMonthYear(selectedMonth)}
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    <div className="flex flex-wrap gap-1">
-                                      {system.gp > 0 && (
-                                        <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-500 rounded-md text-[9px] font-bold">
-                                          GP:{system.gp}
-                                        </span>
-                                      )}
-                                      {system.paid > 0 && (
-                                        <span className="px-1.5 py-0.5 bg-indigo-500/10 text-indigo-500 rounded-md text-[9px] font-bold">
-                                          PAID:{system.paid}
-                                        </span>
-                                      )}
-                                      {system.sa > 0 && (
-                                        <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-500 rounded-md text-[9px] font-bold">
-                                          SA:{system.sa}
-                                        </span>
-                                      )}
-                                      {system.gp === 0 && system.paid === 0 && system.sa === 0 && (
-                                        <span className="text-[10px] text-slate-400 italic">0 aktivitas</span>
-                                      )}
-                                    </div>
                                   </td>
                                   <td className="py-1 px-2 text-center">
                                     <input
