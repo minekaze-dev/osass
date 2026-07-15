@@ -206,6 +206,26 @@ export const getDaysElapsed = (startDateStr: string): number => {
   return diffDays >= 0 ? diffDays : 0;
 };
 
+// Check if a lead is an active prospect
+export const isLeadActiveProspect = (l: Lead): boolean => {
+  if (l.pipeline === 'Aktif') return false;
+  if (l.status === 'Installed') return false;
+
+  if (l.status === 'Not Interested' || l.customerStatus === 'Not Interested') return false;
+  if (l.status === 'Area Full' || l.customerStatus === 'Area Full') return false;
+  if (l.pipeline === 'Tidak Tercover' || l.status === 'Not Coverage') return false;
+  if (l.status === 'Invalid Number') return false;
+  if (l.customerStatus === 'Refund' || l.customerStatus === 'Dismantle') return false;
+
+  if (l.status === 'NBP' || l.customerStatus === 'NBP') {
+    if (getDaysElapsed(l.createdAt) > 3) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 // Automate next reminder date (YYYY-MM-DD) based on status and settings
 export const calculateNextReminderDate = (
   status: FollowUpStatus,

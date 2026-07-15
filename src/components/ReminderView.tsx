@@ -13,7 +13,8 @@ import { Lead, SalesConfig } from '../types';
 import { 
   formatWhatsAppNumber, 
   getStatusColorClasses, 
-  getDaysElapsed 
+  getDaysElapsed,
+  isLeadActiveProspect
 } from '../utils/helpers';
 
 interface ReminderViewProps {
@@ -34,10 +35,7 @@ export default function ReminderView({ leads, onViewLead, onUpdateStatus, config
 
   // Filter out closed and un-actionable prospects
   const actionableLeads = useMemo(() => {
-    return leads.filter(
-      l => l.pipeline !== 'Aktif' && 
-           !['Not Interested', 'Not Coverage', 'Invalid Number'].includes(l.status)
-    );
+    return leads.filter(isLeadActiveProspect);
   }, [leads]);
 
   // Groupings

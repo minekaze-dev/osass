@@ -18,7 +18,8 @@ import {
   PACKAGES,
   PERIOD_OPTIONS,
   PACKAGE_PRICES,
-  LEAD_SOURCES
+  LEAD_SOURCES,
+  isLeadActiveProspect
 } from '../utils/helpers';
 
 interface CustomerViewProps {
@@ -115,7 +116,7 @@ export default function CustomerView({
       const isClosed = l.pipeline === 'Aktif' || !!l.closingDate;
       const matchesClosing = closingFilter === 'all' ||
         (closingFilter === 'closed' && isClosed) ||
-        (closingFilter === 'open' && !isClosed);
+        (closingFilter === 'open' && isLeadActiveProspect(l));
 
       // Source match
       const matchesSource = sourceFilter === 'all' || l.source === sourceFilter;
@@ -146,9 +147,10 @@ export default function CustomerView({
       const isClosed = l.pipeline === 'Aktif' || !!l.closingDate;
       if (isClosed) closedCount++;
 
+      totalCustomers++;
+
       const resolvedCustStatus = l.customerStatus || (l.pipeline === 'Aktif' ? 'Aktif' : 'Follow Up');
       if (resolvedCustStatus) {
-        totalCustomers++;
         if (resolvedCustStatus === 'Aktif') active++;
         if (resolvedCustStatus === 'Refund') refund++;
         if (resolvedCustStatus === 'Dismantle') dismantle++;

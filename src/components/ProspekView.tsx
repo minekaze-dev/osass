@@ -273,6 +273,13 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
           const remarkStatus = mapRemarkToStatus(remarkRaw);
 
           const noteRaw = colIdxNote !== -1 ? String(row[colIdxNote] || '') : '';
+          const isNoteAktif = noteRaw.toLowerCase().includes('aktif');
+
+          const finalStatus = isNoteAktif ? 'Installed' : remarkStatus;
+          const finalPipeline = isNoteAktif ? 'Aktif' : getPipelineForStatus(remarkStatus);
+          const finalCustomerStatus = isNoteAktif ? 'Aktif' : undefined;
+          const finalClosingStatus = isNoteAktif ? 'Closed' : undefined;
+          const finalClosingDate = isNoteAktif ? dateParsed : undefined;
 
           const newLead: Lead = {
             id: `lead-${Date.now()}-${r}-${Math.random().toString(36).substring(2, 9)}`,
@@ -284,19 +291,22 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
             source: '-',
             packageInterest: '-',
             notes: noteRaw,
-            status: remarkStatus,
-            pipeline: getPipelineForStatus(remarkStatus),
-            followUpCount: noteRaw ? 1 : 0,
+            status: finalStatus,
+            pipeline: finalPipeline,
+            followUpCount: (noteRaw || isNoteAktif) ? 1 : 0,
             nextReminderDate: null,
             lastFollowUpDate: dateParsed,
             createdAt: dateParsed,
-            history: noteRaw ? [
+            customerStatus: finalCustomerStatus,
+            closingStatus: finalClosingStatus,
+            closingDate: finalClosingDate,
+            history: (noteRaw || isNoteAktif) ? [
               {
                 id: `hist-${Date.now()}-${r}-${Math.random().toString(36).substring(2, 9)}`,
                 date: `${dateParsed} 12:00`,
-                status: remarkStatus,
-                pipeline: getPipelineForStatus(remarkStatus),
-                notes: noteRaw
+                status: finalStatus,
+                pipeline: finalPipeline,
+                notes: noteRaw || 'Sudah aktif dari import file'
               }
             ] : []
           };

@@ -12,6 +12,7 @@ import {
 import { Lead, SalesConfig, FollowUpStatus, PipelineStage, HistoryEntry, CustomerStatus, User, AuthState } from './types';
 import { INITIAL_SALES_CONFIG } from './mockData';
 import { supabase, updateSupabaseCredentials } from './lib/supabase';
+import { isLeadActiveProspect } from './utils/helpers';
 
 // Views
 import DashboardView from './components/DashboardView';
@@ -129,10 +130,7 @@ export default function App() {
   const TODAY_STR = '2026-07-10';
 
   const dueLeadsCount = useMemo(() => {
-    const actionable = filteredLeads.filter(
-      l => l.pipeline !== 'Aktif' && 
-           !['Not Interested', 'Not Coverage', 'Invalid Number'].includes(l.status)
-    );
+    const actionable = filteredLeads.filter(isLeadActiveProspect);
     const dueOrOverdue = actionable.filter(
       l => l.nextReminderDate !== null && l.nextReminderDate <= TODAY_STR
     );

@@ -24,7 +24,8 @@ import {
   formatIDR, 
   getDaysElapsed, 
   formatWhatsAppNumber, 
-  getStatusColorClasses 
+  getStatusColorClasses,
+  isLeadActiveProspect
 } from '../utils/helpers';
 
 interface DashboardViewProps {
@@ -101,15 +102,12 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
   const totalLeads = leads.length;
   
   const activeProspects = React.useMemo(() => {
-    return leads.filter(
-      l => l.pipeline !== 'Aktif' && 
-           !['Not Interested', 'Not Coverage', 'Invalid Number'].includes(l.status)
-    ).length;
+    return leads.filter(isLeadActiveProspect).length;
   }, [leads]);
 
   const todayReminders = React.useMemo(() => {
     return leads.filter(
-      l => l.nextReminderDate !== null && l.nextReminderDate <= TODAY_STR && l.pipeline !== 'Aktif'
+      l => l.nextReminderDate !== null && l.nextReminderDate <= TODAY_STR && isLeadActiveProspect(l)
     ).length;
   }, [leads]);
 
@@ -131,8 +129,7 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
       .filter(
         l => l.nextReminderDate !== null && 
              l.nextReminderDate <= TODAY_STR && 
-             l.pipeline !== 'Aktif' &&
-             !['Not Interested', 'Not Coverage', 'Invalid Number'].includes(l.status)
+             isLeadActiveProspect(l)
       )
       .sort((a, b) => {
         const dateA = a.nextReminderDate || '';
