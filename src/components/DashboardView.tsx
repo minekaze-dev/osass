@@ -98,16 +98,20 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
   }, [leads, selectedMonth]);
 
   // Calculations
-  const totalLeads = filteredLeads.length;
+  const totalLeads = leads.length;
   
-  const activeProspects = filteredLeads.filter(
-    l => l.pipeline !== 'Aktif' && 
-         !['Not Interested', 'Not Coverage', 'Invalid Number'].includes(l.status)
-  ).length;
+  const activeProspects = React.useMemo(() => {
+    return leads.filter(
+      l => l.pipeline !== 'Aktif' && 
+           !['Not Interested', 'Not Coverage', 'Invalid Number'].includes(l.status)
+    ).length;
+  }, [leads]);
 
-  const todayReminders = filteredLeads.filter(
-    l => l.nextReminderDate !== null && l.nextReminderDate <= TODAY_STR && l.pipeline !== 'Aktif'
-  ).length;
+  const todayReminders = React.useMemo(() => {
+    return leads.filter(
+      l => l.nextReminderDate !== null && l.nextReminderDate <= TODAY_STR && l.pipeline !== 'Aktif'
+    ).length;
+  }, [leads]);
 
   const monthlyClosings = React.useMemo(() => {
     const isClosed = (l: Lead) => l.pipeline === 'Aktif' || l.status === 'Paid' || l.status === 'Installed' || l.status === 'Closing';
@@ -123,7 +127,7 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
 
   // Today's Tasks
   const todayTasks = React.useMemo(() => {
-    return filteredLeads
+    return leads
       .filter(
         l => l.nextReminderDate !== null && 
              l.nextReminderDate <= TODAY_STR && 
@@ -135,7 +139,7 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
         const dateB = b.nextReminderDate || '';
         return dateA.localeCompare(dateB);
       });
-  }, [filteredLeads]);
+  }, [leads]);
 
   // Calculate target progress
   // Calculate daily installations for chart
