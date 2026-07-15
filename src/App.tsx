@@ -1423,6 +1423,21 @@ export default function App() {
               >
                 {config.theme === 'dark' ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4" />}
               </button>
+
+              {/* Settings button on mobile */}
+              <button 
+                onClick={() => setActiveTab('settings')}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer md:hidden ${
+                  activeTab === 'settings'
+                    ? 'text-[#F58220] bg-[#F58220]/10'
+                    : config.theme === 'dark' 
+                      ? 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800' 
+                      : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+                }`}
+                title="Settings"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
             </div>
           </header>
 
@@ -1435,7 +1450,7 @@ export default function App() {
         {/* ================= MOBILE BOTTOM NAVIGATION ================= */}
         {isAdmin ? (
           <nav className={`fixed bottom-0 left-0 right-0 px-2 py-1.5 z-40 flex justify-around md:hidden shadow-lg rounded-t-xl border-t transition-colors duration-200 ${
-            config.theme === 'dark' ? 'bg-[#18181b] border-zinc-800' : 'bg-white border-slate-200'
+            config.theme === 'dark' ? 'bg-[#18181b]/95 border-zinc-800' : 'bg-white border-slate-200'
           }`}>
             <button
               onClick={() => setActiveTab('admin')}
@@ -1445,16 +1460,6 @@ export default function App() {
             >
               <ShieldCheck className="w-5 h-5" />
               <span className="text-[8px] font-bold mt-1">Users</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`flex flex-col items-center justify-center w-24 py-1 rounded-lg transition-colors ${
-                activeTab === 'settings' ? 'text-[#F58220]' : config.theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-slate-400'
-              }`}
-            >
-              <Settings className="w-5 h-5" />
-              <span className="text-[8px] font-bold mt-1">Settings</span>
             </button>
 
             <button
@@ -1535,16 +1540,6 @@ export default function App() {
             >
               <TrendingUp className="w-5 h-5" />
               <span className="text-[8px] font-bold mt-1">Rev</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('settings')}
-              className={`flex flex-col items-center justify-center w-12 py-1 rounded-lg transition-colors ${
-                activeTab === 'settings' ? 'text-[#F58220]' : config.theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-slate-400'
-              }`}
-            >
-              <Settings className="w-5 h-5" />
-              <span className="text-[8px] font-bold mt-1">Set</span>
             </button>
 
             <button

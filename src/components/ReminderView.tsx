@@ -119,52 +119,52 @@ export default function ReminderView({ leads, onViewLead, onUpdateStatus, config
     <div className="space-y-6">
       
       {/* Milestone Counters Dashboard */}
-      <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
-        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Monitoring Status Follow Up</h3>
+      <div className="bg-white dark:bg-[#1c1c1f] p-5 rounded-2xl border border-slate-100 dark:border-zinc-800 shadow-xs">
+        <h3 className="text-xs font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-3">Monitoring Status Follow Up</h3>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           
           {/* FU Hari ke-0 */}
-          <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-slate-500 block">FU Hari ke-0</span>
+          <div className="bg-slate-50 dark:bg-zinc-900/40 p-3 rounded-xl border border-slate-100 dark:border-zinc-800/80 flex flex-col justify-between">
+            <span className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 block">FU Hari ke-0</span>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-lg font-black text-slate-700">{milestoneCounts.fu0}</span>
-              <span className="text-[9px] text-slate-400">leads</span>
+              <span className="text-lg font-black text-slate-700 dark:text-zinc-100">{milestoneCounts.fu0}</span>
+              <span className="text-[9px] text-slate-400 dark:text-zinc-500">leads</span>
             </div>
           </div>
 
           {/* FU Step 1 */}
-          <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100/60 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-blue-600 block">FU Hari ke-{milestoneCounts.pattern[0] || 1}</span>
+          <div className="bg-blue-50/50 dark:bg-blue-950/20 p-3 rounded-xl border border-blue-100/60 dark:border-blue-900/30 flex flex-col justify-between">
+            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 block">FU Hari ke-{milestoneCounts.pattern[0] || 1}</span>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-lg font-black text-blue-700">{milestoneCounts.fu1}</span>
-              <span className="text-[9px] text-blue-400">leads</span>
+              <span className="text-lg font-black text-blue-700 dark:text-blue-300">{milestoneCounts.fu1}</span>
+              <span className="text-[9px] text-blue-400 dark:text-blue-500">leads</span>
             </div>
           </div>
 
           {/* FU Step 2 */}
-          <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100/60 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-amber-600 block font-semibold">FU Hari ke-{milestoneCounts.pattern[1] || 2}</span>
+          <div className="bg-amber-50/50 dark:bg-amber-950/20 p-3 rounded-xl border border-amber-100/60 dark:border-amber-900/30 flex flex-col justify-between">
+            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 block font-semibold">FU Hari ke-{milestoneCounts.pattern[1] || 2}</span>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-lg font-black text-amber-700">{milestoneCounts.fu2}</span>
-              <span className="text-[9px] text-amber-400">leads</span>
+              <span className="text-lg font-black text-amber-700 dark:text-amber-300">{milestoneCounts.fu2}</span>
+              <span className="text-[9px] text-amber-400 dark:text-amber-500">leads</span>
             </div>
           </div>
 
           {/* FU Step 3+ */}
-          <div className="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100/60 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-indigo-600 block">FU Hari ke-{milestoneCounts.pattern[2] || 4}+</span>
+          <div className="bg-indigo-50/50 dark:bg-indigo-950/20 p-3 rounded-xl border border-indigo-100/60 dark:border-indigo-900/30 flex flex-col justify-between">
+            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 block">FU Hari ke-{milestoneCounts.pattern[2] || 4}+</span>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-lg font-black text-indigo-700">{milestoneCounts.fu3}</span>
-              <span className="text-[9px] text-slate-400">leads</span>
+              <span className="text-lg font-black text-indigo-700 dark:text-indigo-300">{milestoneCounts.fu3}</span>
+              <span className="text-[9px] text-slate-400 dark:text-zinc-500">leads</span>
             </div>
           </div>
 
           {/* Terlambat */}
-          <div className="bg-rose-50/50 p-3 rounded-xl border border-rose-100/60 flex flex-col justify-between col-span-2 sm:col-span-1">
-            <span className="text-[10px] font-bold text-rose-600 block">Terlambat FU</span>
+          <div className="bg-rose-50/50 dark:bg-rose-950/20 p-3 rounded-xl border border-rose-100/60 dark:border-rose-900/30 flex flex-col justify-between col-span-2 sm:col-span-1">
+            <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 block">Terlambat FU</span>
             <div className="flex items-baseline gap-1 mt-1">
-              <span className="text-lg font-black text-rose-700">{groups.terlambat.length}</span>
-              <span className="text-[9px] text-rose-400">telat</span>
+              <span className="text-lg font-black text-rose-700 dark:text-rose-300">{groups.terlambat.length}</span>
+              <span className="text-[9px] text-rose-400 dark:text-rose-500">telat</span>
             </div>
           </div>
 

@@ -43,29 +43,59 @@ interface DashboardViewProps {
 export default function DashboardView({ leads, config, userName, onViewLead, onUpdateStatus, onQuickFollowUp }: DashboardViewProps) {
   const TODAY_STR = getTodayStr();
 
-  // Helper to determine the actual transition/closing date in a given month
-  const getTransitionDateInMonth = React.useCallback((l: Lead, monthStr: string): string | null => {
-    // 1. Check history first for transition to 'Aktif' / closed status in this month
+  // Helper to find the date of transition to 'General Payment' (GP)
+  const getGPDate = React.useCallback((l: Lead): string | null => {
+    // 1. Check history for GP
     if (l.history && l.history.length > 0) {
-      const transition = l.history.find(h => 
-        (h.pipeline === 'Aktif' || h.status === 'Installed' || h.status === 'Closing' || h.status === 'Paid') && 
-        h.date && h.date.startsWith(monthStr)
-      );
-      if (transition && transition.date) {
-        return transition.date.split(' ')[0]; // Return "YYYY-MM-DD"
+      const entry = l.history.find(h => h.status === 'General Payment');
+      if (entry && entry.date) {
+        return entry.date.split(' ')[0]; // YYYY-MM-DD
       }
     }
-    
-    // 2. Check closingDate
-    if (l.closingDate && l.closingDate.startsWith(monthStr)) {
+    // 2. If current status is 'General Payment', fallback to lastFollowUpDate or createdAt
+    if (l.status === 'General Payment') {
+      return l.lastFollowUpDate || l.createdAt;
+    }
+    return null;
+  }, []);
+
+  // Helper to find the date of transition to 'Paid'
+  const getPaidDate = React.useCallback((l: Lead): string | null => {
+    // 1. Check history for Paid
+    if (l.history && l.history.length > 0) {
+      const entry = l.history.find(h => h.status === 'Paid');
+      if (entry && entry.date) {
+        return entry.date.split(' ')[0];
+      }
+    }
+    // 2. If current status is 'Paid', fallback to lastFollowUpDate or createdAt
+    if (l.status === 'Paid') {
+      return l.lastFollowUpDate || l.createdAt;
+    }
+    return null;
+  }, []);
+
+  // Helper to find the date of transition to 'Installed' (Pemasangan / Aktif / Closed)
+  const getInstalledDate = React.useCallback((l: Lead): string | null => {
+    // 1. Check closingDate FIRST as it is the explicit user-defined active/closing date
+    if (l.closingDate) {
       return l.closingDate;
     }
-    
-    // 3. Check createdAt
-    if (l.createdAt && l.createdAt.startsWith(monthStr)) {
+    // 2. Check history for Installed or Closing or Aktif
+    if (l.history && l.history.length > 0) {
+      const entry = l.history.find(h => 
+        h.status === 'Installed' || 
+        h.status === 'Closing' || 
+        h.pipeline === 'Aktif'
+      );
+      if (entry && entry.date) {
+        return entry.date.split(' ')[0];
+      }
+    }
+    // 3. If current status is 'Installed' or pipeline is 'Aktif', fallback to createdAt
+    if (l.status === 'Installed' || l.pipeline === 'Aktif' || l.customerStatus === 'Aktif') {
       return l.createdAt;
     }
-    
     return null;
   }, []);
 
@@ -141,15 +171,12 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
   }, [leads]);
 
   const monthlyClosings = React.useMemo(() => {
-    const isClosed = (l: Lead) => l.pipeline === 'Aktif' || l.customerStatus === 'Aktif' || l.status === 'Paid' || l.status === 'Installed' || l.status === 'Closing';
-    if (selectedMonth === 'All') {
-      return leads.filter(isClosed).length;
-    }
     return leads.filter(l => {
-      if (!isClosed(l)) return false;
-      return getTransitionDateInMonth(l, selectedMonth) !== null;
+      const installedDate = getInstalledDate(l);
+      if (!installedDate) return false;
+      return selectedMonth === 'All' || installedDate.startsWith(selectedMonth);
     }).length;
-  }, [leads, selectedMonth, getTransitionDateInMonth]);
+  }, [leads, selectedMonth, getInstalledDate]);
 
   // Today's Tasks
   const todayTasks = React.useMemo(() => {
@@ -192,49 +219,67 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
         }
       }
 
-      // Calculate operational transitions (GP / Paid / Installed)
-      const transitionDate = getTransitionDateInMonth(l, selectedMonth);
-      if (transitionDate) {
-        const day = parseInt(transitionDate.split('-')[2]);
+      // 1. General Payment transition date
+      const gpDate = getGPDate(l);
+      if (gpDate && gpDate.startsWith(selectedMonth)) {
+        const day = parseInt(gpDate.split('-')[2]);
         if (day >= 1 && day <= daysInMonth) {
-          if (l.status === 'General Payment') {
-            data[day - 1].generalPayment += 1;
-          } else if (l.status === 'Paid') {
-            data[day - 1].paid += 1;
-          } else if (l.pipeline === 'Aktif' || l.status === 'Installed' || l.status === 'Closing') {
-            data[day - 1].aktif += 1;
-            data[day - 1].installations += 1;
-          }
+          data[day - 1].generalPayment += 1;
+        }
+      }
+
+      // 2. Paid transition date
+      const paidDate = getPaidDate(l);
+      if (paidDate && paidDate.startsWith(selectedMonth)) {
+        const day = parseInt(paidDate.split('-')[2]);
+        if (day >= 1 && day <= daysInMonth) {
+          data[day - 1].paid += 1;
+        }
+      }
+
+      // 3. Installed transition date
+      const installedDate = getInstalledDate(l);
+      if (installedDate && installedDate.startsWith(selectedMonth)) {
+        const day = parseInt(installedDate.split('-')[2]);
+        if (day >= 1 && day <= daysInMonth) {
+          data[day - 1].aktif += 1;
+          data[day - 1].installations += 1;
         }
       }
     });
 
     return data;
-  }, [leads, selectedMonth, getTransitionDateInMonth]);
+  }, [leads, selectedMonth, getGPDate, getPaidDate, getInstalledDate]);
 
   const stats = React.useMemo(() => {
-    const totalGP = leads.filter(l => l.status === 'General Payment' && (selectedMonth === 'All' || l.createdAt.startsWith(selectedMonth))).length;
-    const totalPaid = leads.filter(l => l.status === 'Paid' && (selectedMonth === 'All' || l.createdAt.startsWith(selectedMonth))).length;
+    const totalGP = leads.filter(l => {
+      const gpDate = getGPDate(l);
+      if (!gpDate) return false;
+      return selectedMonth === 'All' || gpDate.startsWith(selectedMonth);
+    }).length;
+
+    const totalPaid = leads.filter(l => {
+      const paidDate = getPaidDate(l);
+      if (!paidDate) return false;
+      return selectedMonth === 'All' || paidDate.startsWith(selectedMonth);
+    }).length;
     
     const totalInstalled = leads.filter(l => {
-      const isClosed = l.pipeline === 'Aktif' || l.customerStatus === 'Aktif' || l.status === 'Installed';
-      if (!isClosed) return false;
-      if (selectedMonth === 'All') return true;
-      return getTransitionDateInMonth(l, selectedMonth) !== null;
+      const installedDate = getInstalledDate(l);
+      if (!installedDate) return false;
+      return selectedMonth === 'All' || installedDate.startsWith(selectedMonth);
     }).length;
 
     const todayInstalled = leads.filter(l => {
-      const isClosed = l.pipeline === 'Aktif' || l.customerStatus === 'Aktif' || l.status === 'Installed';
-      if (!isClosed) return false;
-      const tDate = getTransitionDateInMonth(l, selectedMonth);
-      return tDate === TODAY_STR;
+      const installedDate = getInstalledDate(l);
+      return installedDate === TODAY_STR;
     }).length;
 
     const totalIncoming = leads.filter(l => selectedMonth === 'All' || l.createdAt.startsWith(selectedMonth)).length;
     const todayIncoming = leads.filter(l => l.createdAt.startsWith(TODAY_STR)).length;
 
     return { totalGP, totalPaid, totalInstalled, todayInstalled, totalIncoming, todayIncoming };
-  }, [leads, selectedMonth, TODAY_STR, getTransitionDateInMonth]);
+  }, [leads, selectedMonth, TODAY_STR, getGPDate, getPaidDate, getInstalledDate]);
 
   const targetProgress = Math.min(100, Math.round((monthlyClosings / config.monthlyTarget) * 100));
 
