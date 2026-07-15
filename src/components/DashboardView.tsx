@@ -7,7 +7,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { 
   Users, UserCheck, Bell, Award, CheckCircle, Check,
-  MessageSquare, ChevronRight, Calendar, AlertCircle, BarChart3, RefreshCw
+  MessageSquare, ChevronRight, Calendar, AlertCircle, BarChart3, RefreshCw, TrendingUp
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -17,7 +17,9 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  Cell
+  Cell,
+  AreaChart,
+  Area
 } from 'recharts';
 import { Lead, SalesConfig } from '../types';
 import { 
@@ -139,7 +141,7 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
   }, [leads]);
 
   // Calculate target progress
-  // Calculate daily installations for chart
+  // Calculate daily installations and incoming data for chart
   const chartData = React.useMemo(() => {
     if (selectedMonth === 'All') return [];
     
@@ -151,10 +153,20 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
       installations: 0,
       generalPayment: 0,
       paid: 0,
-      aktif: 0
+      aktif: 0,
+      incoming: 0
     }));
 
     leads.forEach(l => {
+      // Calculate incoming leads strictly based on l.createdAt
+      if (l.createdAt && l.createdAt.startsWith(selectedMonth)) {
+        const day = parseInt(l.createdAt.split('-')[2]);
+        if (day >= 1 && day <= daysInMonth) {
+          data[day - 1].incoming += 1;
+        }
+      }
+
+      // Calculate operational transitions (GP / Paid / Installed)
       const dateStr = l.closingDate || l.createdAt;
       if (dateStr.startsWith(selectedMonth)) {
         const day = parseInt(dateStr.split('-')[2]);
@@ -180,7 +192,10 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
     const totalInstalled = leads.filter(l => (l.pipeline === 'Aktif' || l.status === 'Installed') && (selectedMonth === 'All' || (l.closingDate || l.createdAt).startsWith(selectedMonth))).length;
     const todayInstalled = leads.filter(l => (l.pipeline === 'Aktif' || l.status === 'Installed') && (l.closingDate === TODAY_STR || (!l.closingDate && l.createdAt.startsWith(TODAY_STR)))).length;
 
-    return { totalGP, totalPaid, totalInstalled, todayInstalled };
+    const totalIncoming = leads.filter(l => selectedMonth === 'All' || l.createdAt.startsWith(selectedMonth)).length;
+    const todayIncoming = leads.filter(l => l.createdAt.startsWith(TODAY_STR)).length;
+
+    return { totalGP, totalPaid, totalInstalled, todayInstalled, totalIncoming, todayIncoming };
   }, [leads, selectedMonth]);
 
   const targetProgress = Math.min(100, Math.round((monthlyClosings / config.monthlyTarget) * 100));
@@ -319,96 +334,183 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
         </div>
       </div>
 
-      {/* Daily Performance Chart */}
+      {/* Daily Charts Section */}
       {selectedMonth !== 'All' && (
-        <div className={`p-5 rounded-2xl border shadow-xs ${config.theme === 'dark' ? 'bg-[#18181b] border-zinc-800' : 'bg-white border-slate-100'}`}>
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-2">
-              <div className={`p-2 rounded-lg ${config.theme === 'dark' ? 'bg-orange-500/10 text-orange-500' : 'bg-orange-50 text-[#F58220]'}`}>
-                <BarChart3 className="w-5 h-5" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Daily Performance Chart */}
+          <div className={`p-5 rounded-2xl border shadow-xs ${config.theme === 'dark' ? 'bg-[#18181b] border-zinc-800' : 'bg-white border-slate-100'}`}>
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-lg ${config.theme === 'dark' ? 'bg-orange-500/10 text-orange-500' : 'bg-orange-50 text-[#F58220]'}`}>
+                  <BarChart3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className={`text-sm font-bold whitespace-nowrap ${config.theme === 'dark' ? 'text-zinc-100' : 'text-slate-800'}`}>
+                    Grafik Aktivitas Harian
+                  </h3>
+                  <p className={`text-[10px] ${config.theme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>
+                    Performa harian periode {formatMonthYear(selectedMonth)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className={`text-sm font-bold ${config.theme === 'dark' ? 'text-zinc-100' : 'text-slate-800'}`}>
-                  Grafik Aktivitas Harian
-                </h3>
-                <p className={`text-[10px] ${config.theme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>
-                  Performa harian periode {formatMonthYear(selectedMonth)}
-                </p>
+              
+              <div className="flex flex-nowrap gap-1.5 select-none">
+                <div className={`px-2 py-1 rounded-lg flex flex-col items-center justify-center min-w-[55px] ${config.theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
+                  <span className={`text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>TOTAL GP</span>
+                  <span className={`text-xs font-black ${config.theme === 'dark' ? 'text-blue-100' : 'text-blue-700'}`}>{stats.totalGP}</span>
+                </div>
+                <div className={`px-2 py-1 rounded-lg flex flex-col items-center justify-center min-w-[65px] ${config.theme === 'dark' ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
+                  <span className={`text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>TOTAL PAID</span>
+                  <span className={`text-xs font-black ${config.theme === 'dark' ? 'text-indigo-100' : 'text-indigo-700'}`}>{stats.totalPaid}</span>
+                </div>
+                <div className={`px-2 py-1 rounded-lg flex flex-col items-center justify-center min-w-[100px] border border-emerald-500/20 ${config.theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+                  <span className={`text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>PEMASANGAN HARI INI</span>
+                  <span className={`text-xs font-black ${config.theme === 'dark' ? 'text-emerald-100' : 'text-emerald-700'}`}>{stats.todayInstalled}</span>
+                </div>
               </div>
             </div>
-            
-            <div className="flex flex-wrap gap-2">
-              <div className={`px-3 py-1.5 rounded-lg flex flex-col items-center min-w-[80px] ${config.theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-                <span className={`text-[9px] font-bold ${config.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>TOTAL GP</span>
-                <span className={`text-sm font-black ${config.theme === 'dark' ? 'text-blue-100' : 'text-blue-700'}`}>{stats.totalGP}</span>
-              </div>
-              <div className={`px-3 py-1.5 rounded-lg flex flex-col items-center min-w-[80px] ${config.theme === 'dark' ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
-                <span className={`text-[9px] font-bold ${config.theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>TOTAL PAID</span>
-                <span className={`text-sm font-black ${config.theme === 'dark' ? 'text-indigo-100' : 'text-indigo-700'}`}>{stats.totalPaid}</span>
-              </div>
-              <div className={`px-3 py-1.5 rounded-lg flex flex-col items-center min-w-[100px] border border-emerald-500/20 ${config.theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-                <span className={`text-[9px] font-bold ${config.theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>PEMASANGAN HARI INI</span>
-                <span className={`text-sm font-black ${config.theme === 'dark' ? 'text-emerald-100' : 'text-emerald-700'}`}>{stats.todayInstalled}</span>
-              </div>
+
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                  <CartesianGrid 
+                    strokeDasharray="3 3" 
+                    vertical={false} 
+                    stroke={config.theme === 'dark' ? '#27272a' : '#f1f5f9'} 
+                  />
+                  <XAxis 
+                    dataKey="day" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fill: config.theme === 'dark' ? '#71717a' : '#94a3b8' }}
+                    interval={Math.floor(chartData.length / 10)}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fill: config.theme === 'dark' ? '#71717a' : '#94a3b8' }}
+                    allowDecimals={false}
+                  />
+                  <Tooltip 
+                    cursor={{ fill: config.theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const d = payload[0].payload;
+                        return (
+                          <div className={`p-3 rounded-xl border shadow-lg text-[10px] space-y-1 ${
+                            config.theme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-100 text-slate-800'
+                          }`}>
+                            <p className="font-bold border-b pb-1 mb-1 border-slate-100 dark:border-zinc-800">
+                              {d.day} {formatMonthYear(selectedMonth)}
+                            </p>
+                            <p className="flex justify-between gap-4">
+                              <span className="text-blue-500">General Payment:</span>
+                              <span className="font-bold">{d.generalPayment}</span>
+                            </p>
+                            <p className="flex justify-between gap-4">
+                              <span className="text-indigo-500">Paid:</span>
+                              <span className="font-bold">{d.paid}</span>
+                            </p>
+                            <p className="flex justify-between gap-4 border-t pt-1 mt-1 border-slate-50 dark:border-zinc-800/50">
+                              <span className="text-[#F58220]">Instalasi:</span>
+                              <span className="font-bold">{d.aktif}</span>
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar dataKey="generalPayment" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={14} />
+                  <Bar dataKey="paid" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} barSize={14} />
+                  <Bar dataKey="aktif" stackId="a" fill="#F58220" radius={[4, 4, 0, 0]} barSize={14} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                <CartesianGrid 
-                  strokeDasharray="3 3" 
-                  vertical={false} 
-                  stroke={config.theme === 'dark' ? '#27272a' : '#f1f5f9'} 
-                />
-                <XAxis 
-                  dataKey="day" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fill: config.theme === 'dark' ? '#71717a' : '#94a3b8' }}
-                  interval={Math.floor(chartData.length / 10)}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fill: config.theme === 'dark' ? '#71717a' : '#94a3b8' }}
-                  allowDecimals={false}
-                />
-                <Tooltip 
-                  cursor={{ fill: config.theme === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const d = payload[0].payload;
-                      return (
-                        <div className={`p-3 rounded-xl border shadow-lg text-[10px] space-y-1 ${
-                          config.theme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-100 text-slate-800'
-                        }`}>
-                          <p className="font-bold border-b pb-1 mb-1 border-slate-100 dark:border-zinc-800">
-                            {d.day} {formatMonthYear(selectedMonth)}
-                          </p>
-                          <p className="flex justify-between gap-4">
-                            <span className="text-blue-500">General Payment:</span>
-                            <span className="font-bold">{d.generalPayment}</span>
-                          </p>
-                          <p className="flex justify-between gap-4">
-                            <span className="text-indigo-500">Paid:</span>
-                            <span className="font-bold">{d.paid}</span>
-                          </p>
-                          <p className="flex justify-between gap-4 border-t pt-1 mt-1 border-slate-50 dark:border-zinc-800/50">
-                            <span className="text-[#F58220]">Instalasi:</span>
-                            <span className="font-bold">{d.aktif}</span>
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Bar dataKey="generalPayment" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={14} />
-                <Bar dataKey="paid" stackId="a" fill="#6366f1" radius={[0, 0, 0, 0]} barSize={14} />
-                <Bar dataKey="aktif" stackId="a" fill="#F58220" radius={[4, 4, 0, 0]} barSize={14} />
-              </BarChart>
-            </ResponsiveContainer>
+          {/* Grafik Data Masuk (Incoming Data Chart) */}
+          <div className={`p-5 rounded-2xl border shadow-xs ${config.theme === 'dark' ? 'bg-[#18181b] border-zinc-800' : 'bg-white border-slate-100'}`}>
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-lg ${config.theme === 'dark' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className={`text-sm font-bold whitespace-nowrap ${config.theme === 'dark' ? 'text-zinc-100' : 'text-slate-800'}`}>
+                    Grafik Data Masuk
+                  </h3>
+                  <p className={`text-[10px] ${config.theme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>
+                    Total lead baru masuk periode {formatMonthYear(selectedMonth)}
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex flex-nowrap gap-1.5 select-none">
+                <div className={`px-2 py-1 rounded-lg flex flex-col items-center justify-center min-w-[70px] ${config.theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+                  <span className={`text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600'}`}>TOTAL MASUK</span>
+                  <span className={`text-xs font-black ${config.theme === 'dark' ? 'text-emerald-100' : 'text-emerald-700'}`}>{stats.totalIncoming}</span>
+                </div>
+                <div className={`px-2 py-1 rounded-lg flex flex-col items-center justify-center min-w-[75px] border border-orange-500/20 ${config.theme === 'dark' ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
+                  <span className={`text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-orange-400' : 'text-orange-600'}`}>MASUK HARI INI</span>
+                  <span className={`text-xs font-black ${config.theme === 'dark' ? 'text-orange-100' : 'text-orange-700'}`}>{stats.todayIncoming}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorIncoming" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid 
+                    strokeDasharray="3 3" 
+                    vertical={false} 
+                    stroke={config.theme === 'dark' ? '#27272a' : '#f1f5f9'} 
+                  />
+                  <XAxis 
+                    dataKey="day" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fill: config.theme === 'dark' ? '#71717a' : '#94a3b8' }}
+                    interval={Math.floor(chartData.length / 10)}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fill: config.theme === 'dark' ? '#71717a' : '#94a3b8' }}
+                    allowDecimals={false}
+                  />
+                  <Tooltip 
+                    cursor={{ stroke: config.theme === 'dark' ? '#3f3f46' : '#e2e8f0', strokeWidth: 1 }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const d = payload[0].payload;
+                        return (
+                          <div className={`p-3 rounded-xl border shadow-lg text-[10px] space-y-1 ${
+                            config.theme === 'dark' ? 'bg-zinc-900 border-zinc-800 text-zinc-100' : 'bg-white border-slate-100 text-slate-800'
+                          }`}>
+                            <p className="font-bold border-b pb-1 mb-1 border-slate-100 dark:border-zinc-800">
+                              {d.day} {formatMonthYear(selectedMonth)}
+                            </p>
+                            <p className="flex justify-between gap-4">
+                              <span className="text-emerald-500">Lead Baru Masuk:</span>
+                              <span className="font-bold">{d.incoming}</span>
+                            </p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Area type="monotone" dataKey="incoming" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorIncoming)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       )}
