@@ -32,7 +32,7 @@ interface CustomerViewProps {
     customerId?: string
   ) => void;
   onViewLead: (lead: Lead, historyOnly?: boolean) => void;
-  onQuickClosing?: (leadId: string, action: 'Not Closed' | 'On Process' | 'Closed') => void;
+  onQuickClosing?: (leadId: string, action: 'Not Closed' | 'On Process' | 'Closed' | 'Installation' | 'Refund') => void;
   config: SalesConfig;
   userName: string;
 }
@@ -106,7 +106,7 @@ export default function CustomerView({
         l.area.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Customer Status Filter
-      const resolvedCustStatus = l.customerStatus || (l.pipeline === 'Aktif' ? 'Aktif' : null);
+      const resolvedCustStatus = l.customerStatus || (l.pipeline === 'Aktif' ? 'Aktif' : 'Follow Up');
       const matchesStatus = statusFilter === 'all' || 
         (statusFilter === 'none' && !resolvedCustStatus) ||
         (resolvedCustStatus === statusFilter);
@@ -146,7 +146,7 @@ export default function CustomerView({
       const isClosed = l.pipeline === 'Aktif' || !!l.closingDate;
       if (isClosed) closedCount++;
 
-      const resolvedCustStatus = l.customerStatus || (l.pipeline === 'Aktif' ? 'Aktif' : null);
+      const resolvedCustStatus = l.customerStatus || (l.pipeline === 'Aktif' ? 'Aktif' : 'Follow Up');
       if (resolvedCustStatus) {
         totalCustomers++;
         if (resolvedCustStatus === 'Aktif') active++;

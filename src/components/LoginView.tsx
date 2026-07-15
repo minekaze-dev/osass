@@ -269,7 +269,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     </>
                   ) : (
                     <>
-                      <span>Authorize</span>
+                      <span>Connect</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </>
                   )}

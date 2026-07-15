@@ -11,7 +11,8 @@ export type LeadSource =
   | 'Webcover'
   | 'Tiktok'
   | 'Whatsapp'
-  | 'Lainnya';
+  | 'Lainnya'
+  | '-';
 
 export type FollowUpStatus =
   | 'Interested'
@@ -78,7 +79,7 @@ export interface Lead {
   
   // Customer specific fields
   customerStatus?: CustomerStatus | null;
-  closingStatus?: 'Not Closed' | 'On Process' | 'Closed';
+  closingStatus?: 'Not Closed' | 'On Process' | 'Closed' | 'Installation' | 'Refund';
   closingDate?: string | null; // YYYY-MM-DD
   subscriptionPeriod?: string | null; // e.g. "12 Bulan", "24 Bulan"
   customerId?: string;

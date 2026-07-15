@@ -8,8 +8,9 @@ import { motion } from 'motion/react';
 import { 
   Search, Filter, MessageSquare, Phone, MapPin, 
   RefreshCw, Eye, Tag, Calendar, HelpCircle, LayoutGrid, CheckCircle2, Clock, 
-  Edit2, Check, X
+  Edit2, Check, X, Upload, FileSpreadsheet
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { Lead, FollowUpStatus, PipelineStage, SalesConfig } from '../types';
 import { 
   AREAS, 
@@ -36,11 +37,12 @@ interface ProspekViewProps {
   onViewLead: (lead: Lead, historyOnly?: boolean) => void;
   onUpdateStatus: (lead: Lead) => void;
   onUpdateLead: (lead: Lead) => void;
+  onImportLeads?: (importedLeads: Lead[]) => void;
   config: SalesConfig;
   userName: string;
 }
 
-export default function ProspekView({ leads, onViewLead, onUpdateStatus, config, userName }: ProspekViewProps) {
+export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdateLead, onImportLeads, config, userName }: ProspekViewProps) {
   const [search, setSearch] = useState('');
   const [selectedPipeline, setSelectedPipeline] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
@@ -49,11 +51,14 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [tempDate, setTempDate] = useState<string>('');
+  const [tempSource, setTempSource] = useState<string>('');
 
   // Handle row edit start
   const startEditing = (lead: Lead) => {
     setEditingRow(lead.id);
-    setTempDate(lead.createdAt);
+    const dateOnly = lead.createdAt ? lead.createdAt.split('T')[0] : '';
+    setTempDate(dateOnly);
+    setTempSource(lead.source || '-');
   };
 
   // Pipeline Counts for top progress summary bar
@@ -108,8 +113,250 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
     });
   }, [leads, search, selectedPipeline, selectedStatus, selectedArea, selectedDate]);
 
+  // Helper to parse dates
+  const parseIndonesianOrStandardDate = (dateStr: string): string => {
+    if (!dateStr) return new Date().toISOString().split('T')[0];
+    
+    let str = dateStr.trim().toLowerCase();
+    
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+      return str.substring(0, 10);
+    }
+    
+    const idMonths: Record<string, string> = {
+      'januari': '01', 'jan': '01',
+      'februari': '02', 'feb': '02',
+      'maret': '03', 'mar': '03',
+      'april': '04', 'apr': '04',
+      'mei': '05',
+      'juni': '06', 'jun': '06',
+      'juli': '07', 'jul': '07',
+      'agustus': '08', 'agu': '08', 'ags': '08',
+      'september': '09', 'sep': '09',
+      'oktober': '10', 'okt': '10',
+      'november': '11', 'nov': '11',
+      'desember': '12', 'des': '12'
+    };
+
+    const parts = str.split(/\s+/);
+    if (parts.length >= 3) {
+      const day = parts[0].padStart(2, '0');
+      const monthWord = parts[1];
+      const year = parts[2];
+      
+      const monthNum = idMonths[monthWord];
+      if (monthNum && /^\d+$/.test(day) && /^\d{4}$/.test(year)) {
+        return `${year}-${monthNum}-${day}`;
+      }
+    }
+
+    const slashParts = str.split(/[\/\-]/);
+    if (slashParts.length === 3) {
+      const p1 = slashParts[0].padStart(2, '0');
+      const p2 = slashParts[1].padStart(2, '0');
+      const p3 = slashParts[2];
+      
+      if (p3.length === 4 && /^\d+$/.test(p1) && /^\d+$/.test(p2)) {
+        return `${p3}-${p2}-${p1}`;
+      }
+      if (p1.length === 4 && /^\d+$/.test(p2) && /^\d+$/.test(p3)) {
+        return `${p1}-${p2}-${p3}`;
+      }
+    }
+
+    try {
+      const d = new Date(dateStr);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().split('T')[0];
+      }
+    } catch (e) {}
+
+    return new Date().toISOString().split('T')[0];
+  };
+
+  const mapRemarkToStatus = (remark: string): FollowUpStatus => {
+    const clean = (remark || '').trim().toUpperCase();
+    if (clean.includes('NOT INT')) return 'Not Interested';
+    if (clean.includes('NBP') || clean.includes('TIDAK RESPON')) return 'NBP';
+    if (clean.includes('UNCOVER') || clean.includes('NOT COV') || clean.includes('TIDAK TERCOVER')) return 'Not Coverage';
+    if (clean.includes('INTEREST')) return 'Interested';
+    if (clean.includes('THINKING')) return 'Thinking';
+    if (clean.includes('PAID')) return 'Paid';
+    if (clean.includes('CLOSING')) return 'Closing';
+    if (clean.includes('INSTALLED') || clean.includes('AKTIF') || clean === 'ACTIVE') return 'Installed';
+    if (clean.includes('AREA FULL')) return 'Area Full';
+    if (clean.includes('INVALID')) return 'Invalid Number';
+    if (clean.includes('GENERAL PAYMENT') || clean.includes('GP')) return 'General Payment';
+    return 'Interested';
+  };
+
+  const getPipelineForStatus = (status: FollowUpStatus): PipelineStage => {
+    if (status === 'Installed' || status === 'Closing' || status === 'Paid') return 'Aktif';
+    if (status === 'General Payment') return 'Menunggu Berkas';
+    if (status === 'Not Interested' || status === 'Not Coverage' || status === 'Invalid Number') return 'Tidak Tercover';
+    return 'Follow Up';
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const workbook = XLSX.read(bstr, { type: 'binary', cellDates: true });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        const rawData = XLSX.utils.sheet_to_json<any>(worksheet, { header: 1 });
+        if (rawData.length === 0) {
+          alert('File kosong!');
+          return;
+        }
+
+        const headers = (rawData[0] as any[]).map(h => String(h || '').trim().toLowerCase());
+        
+        const colIdxTanggal = headers.findIndex(h => h.includes('tanggal') || h === 'tgl');
+        const colIdxNoHP = headers.findIndex(h => h.includes('hp') || h.includes('telp') || h.includes('wa') || h.includes('phone') || h.includes('no wa') || h.includes('no telepon') || h.includes('no_hp'));
+        const colIdxRemark = headers.findIndex(h => h.includes('remark') || h.includes('status') || h.includes('keterangan'));
+        const colIdxNote = headers.findIndex(h => h.includes('note') || h.includes('riwayat') || h.includes('fu') || h.includes('follow up') || h.includes('keterangan'));
+
+        if (colIdxNoHP === -1) {
+          alert('Kolom "No HP" atau nomor telepon tidak ditemukan di baris pertama file!');
+          return;
+        }
+
+        const importedLeads: Lead[] = [];
+        
+        let maxCstNumber = 0;
+        leads.forEach(l => {
+          const match = (l.name || '').match(/cst-(\d+)/i);
+          if (match) {
+            const num = parseInt(match[1], 10);
+            if (num > maxCstNumber) {
+              maxCstNumber = num;
+            }
+          }
+        });
+
+        for (let r = 1; r < rawData.length; r++) {
+          const row = rawData[r] as any[];
+          if (!row || row.length === 0) continue;
+
+          const phoneRaw = colIdxNoHP !== -1 ? row[colIdxNoHP] : null;
+          if (!phoneRaw) continue;
+
+          let cleanedPhone = String(phoneRaw).replace(/[^\d+]/g, '').trim();
+          if (!cleanedPhone) continue;
+
+          if (cleanedPhone.startsWith('0')) {
+            cleanedPhone = '62' + cleanedPhone.substring(1);
+          } else if (!cleanedPhone.startsWith('62') && !cleanedPhone.startsWith('+')) {
+            cleanedPhone = '62' + cleanedPhone;
+          }
+
+          let dateParsed = new Date().toISOString().split('T')[0];
+          if (colIdxTanggal !== -1 && row[colIdxTanggal]) {
+            const dateVal = row[colIdxTanggal];
+            if (dateVal instanceof Date) {
+              dateParsed = dateVal.toISOString().split('T')[0];
+            } else {
+              dateParsed = parseIndonesianOrStandardDate(String(dateVal));
+            }
+          }
+
+          const nextNum = maxCstNumber + importedLeads.length + 1;
+          const customerName = `cst-${String(nextNum).padStart(3, '0')}`;
+
+          const remarkRaw = colIdxRemark !== -1 ? String(row[colIdxRemark] || '') : '';
+          const remarkStatus = mapRemarkToStatus(remarkRaw);
+
+          const noteRaw = colIdxNote !== -1 ? String(row[colIdxNote] || '') : '';
+
+          const newLead: Lead = {
+            id: `lead-${Date.now()}-${r}-${Math.random().toString(36).substring(2, 9)}`,
+            userId: 'admin',
+            whatsapp: cleanedPhone,
+            name: customerName,
+            address: '-',
+            area: '-',
+            source: '-',
+            packageInterest: '-',
+            notes: noteRaw,
+            status: remarkStatus,
+            pipeline: getPipelineForStatus(remarkStatus),
+            followUpCount: noteRaw ? 1 : 0,
+            nextReminderDate: null,
+            lastFollowUpDate: dateParsed,
+            createdAt: dateParsed,
+            history: noteRaw ? [
+              {
+                id: `hist-${Date.now()}-${r}-${Math.random().toString(36).substring(2, 9)}`,
+                date: `${dateParsed} 12:00`,
+                status: remarkStatus,
+                pipeline: getPipelineForStatus(remarkStatus),
+                notes: noteRaw
+              }
+            ] : []
+          };
+
+          importedLeads.push(newLead);
+        }
+
+        if (importedLeads.length === 0) {
+          alert('Tidak ada data prospek valid yang bisa diimpor.');
+          return;
+        }
+
+        if (onImportLeads) {
+          onImportLeads(importedLeads);
+          alert(`Berhasil mengimpor ${importedLeads.length} data prospek!`);
+        } else {
+          alert('Callback onImportLeads tidak tersedia.');
+        }
+
+      } catch (error: any) {
+        console.error('Error importing file:', error);
+        alert('Gagal membaca file: ' + error.message);
+      }
+    };
+
+    reader.readAsBinaryString(file);
+    e.target.value = '';
+  };
+
   return (
     <div className="space-y-6">
+
+      {/* Import Prospek Panel */}
+      <div className="bg-white dark:bg-[#1c1c1f] rounded-2xl border border-slate-100 dark:border-zinc-800 p-5 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-orange-50 dark:bg-orange-950/20 rounded-xl shrink-0">
+            <Upload className="w-5 h-5 text-[#F58220]" />
+          </div>
+          <div>
+            <h3 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-zinc-100">Impor Data Prospek</h3>
+            <p className="text-[10px] sm:text-xs text-slate-400 dark:text-zinc-500 mt-0.5">Unggah CSV atau Excel (.xlsx/.xls) dengan kolom: Tanggal, No, No HP, Remark, Note</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <input
+            type="file"
+            id="prospek-file-import"
+            accept=".csv,.xlsx,.xls"
+            onChange={handleImportFile}
+            className="hidden"
+          />
+          <button
+            onClick={() => document.getElementById('prospek-file-import')?.click()}
+            className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-[#F58220] to-[#E0721B] hover:opacity-95 text-white text-xs font-bold rounded-xl shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Pilih File CSV / Excel
+          </button>
+        </div>
+      </div>
       
       {/* Pipeline Stages Visual Counter */}
       {/* 
@@ -361,10 +608,23 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
 
                       {/* Source */}
                       <td className="py-2.5 px-3 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                           <Tag className="w-3 h-3 text-[#F58220]" />
-                           <span className="font-bold text-slate-700 dark:text-zinc-200 text-[11px]">{prospect.source || '-'}</span>
-                        </div>
+                        {editingRow === prospect.id ? (
+                          <select
+                            value={tempSource}
+                            onChange={(e) => setTempSource(e.target.value)}
+                            className="px-1.5 py-0.5 border border-slate-200 dark:border-zinc-700 rounded-md text-[11px] bg-white dark:bg-zinc-900 text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-orange-200"
+                          >
+                            <option value="-">-</option>
+                            {LEAD_SOURCES.map(src => (
+                              <option key={src} value={src}>{src}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                             <Tag className="w-3 h-3 text-[#F58220]" />
+                             <span className="font-bold text-slate-700 dark:text-zinc-200 text-[11px]">{prospect.source || '-'}</span>
+                          </div>
+                        )}
                       </td>
 
                       {/* Status */}
@@ -396,7 +656,7 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, config,
                             <>
                               <button
                                 onClick={() => {
-                                    onUpdateLead({...prospect, createdAt: tempDate});
+                                    onUpdateLead({...prospect, createdAt: tempDate, source: tempSource as any});
                                     setEditingRow(null);
                                 }}
                                 className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all shadow-sm flex items-center justify-center"

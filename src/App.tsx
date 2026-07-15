@@ -612,7 +612,7 @@ export default function App() {
 
         if (error) {
           console.error('Oxygen Auth: Error query Supabase saat login:', error);
-          setLoginError(`Koneksi Supabase gagal: ${error.message} (Kode: ${error.code || 'UNKNOWN'}). Pastikan tabel 'users' sudah dibuat dan RLS sudah diizinkan.`);
+          setLoginError('Verifikasi Gagal, Pastikan Kode Anda Sesuai');
           setIsLoggingIn(false);
           return;
         }
@@ -649,14 +649,14 @@ export default function App() {
         } else {
           console.warn('Oxygen Auth: Kode tidak cocok dengan baris data manapun di tabel "users" Supabase. Ini bisa disebabkan karena data benar-benar tidak ada atau kebijakan RLS SELECT memblokir akses.');
           // If Supabase is active and the user is NOT found in Supabase table, reject login immediately
-          setLoginError('Kode akses tidak terdaftar di database Supabase ATAU kebijakan RLS SELECT memblokir pembacaan tabel users. Pastikan Anda telah menjalankan script SQL RLS di Supabase.');
+          setLoginError('Verifikasi Gagal, Pastikan Kode Anda Sesuai');
           setIsLoggingIn(false);
           return;
         }
       }
     } catch (err: any) {
-      console.error('Oxygen Auth: Verifikasi Supabase gagal dengan exception:', err);
-      setLoginError(`Gagal melakukan verifikasi: ${err.message || err}`);
+      console.error('Oxygen Auth: Verifikasi Supabase gagal with exception:', err);
+      setLoginError('Verifikasi Gagal, Pastikan Kode Anda Sesuai');
       setIsLoggingIn(false);
       return;
     }
@@ -672,11 +672,7 @@ export default function App() {
       setActiveTab('dashboard');
     } else {
       console.warn('Oxygen Auth: Gagal login lokal. Kode tidak terdaftar di browser local storage.');
-      if (supabase) {
-        setLoginError('Kode akses tidak valid di Supabase. Pastikan data user ada di tabel dan kebijakan RLS SELECT sudah aktif.');
-      } else {
-        setLoginError('Kode akses tidak valid');
-      }
+      setLoginError('Verifikasi Gagal, Pastikan Kode Anda Sesuai');
     }
     setIsLoggingIn(false);
   };
@@ -864,10 +860,22 @@ export default function App() {
     const updated = leads.map(l => {
       if (l.id === leadId) {
         let pipeline = l.pipeline;
+        let closingStatus = l.closingStatus;
         if (customerStatus === 'Aktif') {
           pipeline = 'Aktif';
+          closingStatus = 'Closed';
         } else if (customerStatus === 'Follow Up') {
           pipeline = 'Follow Up';
+          closingStatus = 'Not Closed';
+        } else if (customerStatus === 'Refund') {
+          pipeline = 'Tidak Tercover';
+          closingStatus = 'Refund';
+        } else if (customerStatus === 'Dismantle') {
+          pipeline = 'Tidak Tercover';
+          closingStatus = 'Not Closed';
+        } else if (customerStatus === 'Not Interested') {
+          pipeline = 'Tidak Tercover';
+          closingStatus = 'Not Closed';
         }
         
         const newHistoryEntry = {
@@ -884,6 +892,7 @@ export default function App() {
           closingDate,
           subscriptionPeriod,
           pipeline,
+          closingStatus,
           customerId: customerId || l.customerId,
           packageInterest: packageInterest || l.packageInterest,
           history: [newHistoryEntry, ...l.history],
@@ -902,7 +911,7 @@ export default function App() {
   };
 
   // Handle Quick Closing Status Change
-  const handleQuickClosing = (leadId: string, action: 'Not Closed' | 'On Process' | 'Closed') => {
+  const handleQuickClosing = (leadId: string, action: 'Not Closed' | 'On Process' | 'Closed' | 'Installation' | 'Refund') => {
     const todayStr = '2026-07-10';
     const timeStr = '15:45';
     
@@ -912,17 +921,50 @@ export default function App() {
           const newHistoryEntry = {
             id: `hist-${Date.now()}-closing`,
             date: `${todayStr} ${timeStr}`,
-            status: 'Interested' as FollowUpStatus,
+            status: 'Installed' as FollowUpStatus,
             pipeline: 'Aktif' as PipelineStage,
             notes: 'Quick update: Customer closed (Aktif).',
           };
           return {
             ...l,
             pipeline: 'Aktif' as PipelineStage,
-            status: 'Interested' as FollowUpStatus,
+            status: 'Installed' as FollowUpStatus,
             customerStatus: 'Aktif' as CustomerStatus,
             closingDate: l.closingDate || todayStr, // preserve if exists, else today
             closingStatus: 'Closed' as const,
+            history: [newHistoryEntry, ...l.history],
+          };
+        } else if (action === 'Installation') {
+          const newHistoryEntry = {
+            id: `hist-${Date.now()}-installation`,
+            date: `${todayStr} ${timeStr}`,
+            status: 'Closing' as FollowUpStatus,
+            pipeline: 'Instalasi' as PipelineStage,
+            notes: 'Quick update: Customer in installation phase.',
+          };
+          return {
+            ...l,
+            pipeline: 'Instalasi' as PipelineStage,
+            status: 'Closing' as FollowUpStatus,
+            customerStatus: 'Follow Up' as CustomerStatus,
+            closingStatus: 'Installation' as const,
+            history: [newHistoryEntry, ...l.history],
+          };
+        } else if (action === 'Refund') {
+          const newHistoryEntry = {
+            id: `hist-${Date.now()}-refund`,
+            date: `${todayStr} ${timeStr}`,
+            status: 'Not Interested' as FollowUpStatus,
+            pipeline: 'Tidak Tercover' as PipelineStage,
+            notes: 'Quick update: Customer cancelled/refunded.',
+          };
+          return {
+            ...l,
+            pipeline: 'Tidak Tercover' as PipelineStage,
+            status: 'Not Interested' as FollowUpStatus,
+            customerStatus: 'Refund' as CustomerStatus,
+            closingDate: l.closingDate || todayStr,
+            closingStatus: 'Refund' as const,
             history: [newHistoryEntry, ...l.history],
           };
         } else if (action === 'On Process') {
@@ -1079,8 +1121,16 @@ export default function App() {
             onUpdateStatus={(lead) => setUpdateLead(lead)} 
             onUpdateLead={(lead) => {
               const newLeads = leads.map(l => l.id === lead.id ? lead : l);
-              setLeads(newLeads);
-              localStorage.setItem('oxygen_leads', JSON.stringify(newLeads));
+              saveLeads(newLeads);
+            }}
+            onImportLeads={(importedLeads) => {
+              const currentUserId = auth.user?.id || 'admin';
+              const mapped = importedLeads.map(l => ({
+                ...l,
+                userId: currentUserId
+              }));
+              const newLeads = [...leads, ...mapped];
+              saveLeads(newLeads);
             }}
             config={config}
           />
