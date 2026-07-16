@@ -13,6 +13,7 @@ export const INITIAL_SALES_CONFIG: SalesConfig = {
   reminderNBPDays: 1,
   theme: 'light',
   reminderPattern: '1,2,4,7',
+  showActiveProspectsCard: false,
 };
 
 // Generate date relative to today's local time (2026-07-10)

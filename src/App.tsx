@@ -178,7 +178,11 @@ export default function App() {
 
       if (storedConfig) {
         try {
-          setConfig(JSON.parse(storedConfig));
+          const parsed = JSON.parse(storedConfig);
+          setConfig({
+            ...INITIAL_SALES_CONFIG,
+            ...parsed
+          });
         } catch (e) {
           setConfig(INITIAL_SALES_CONFIG);
         }
@@ -273,6 +277,7 @@ export default function App() {
               reminderNBPDays: Number(dbConfig.reminderNBPDays) || INITIAL_SALES_CONFIG.reminderNBPDays,
               theme: dbConfig.theme || INITIAL_SALES_CONFIG.theme,
               reminderPattern: dbConfig.reminderPattern || INITIAL_SALES_CONFIG.reminderPattern,
+              showActiveProspectsCard: dbConfig.showActiveProspectsCard !== undefined ? !!dbConfig.showActiveProspectsCard : INITIAL_SALES_CONFIG.showActiveProspectsCard,
             };
             setConfig(parsedConfig);
             localStorage.setItem('oxygen_config', JSON.stringify(parsedConfig));
@@ -409,6 +414,7 @@ export default function App() {
           reminderNBPDays: newConfig.reminderNBPDays,
           theme: newConfig.theme,
           reminderPattern: newConfig.reminderPattern,
+          showActiveProspectsCard: newConfig.showActiveProspectsCard,
         }, { onConflict: 'id' });
       } catch (err) {
         console.error('Error auto-syncing config to Supabase:', err);
@@ -437,6 +443,7 @@ export default function App() {
           reminderNBPDays: config.reminderNBPDays,
           theme: config.theme,
           reminderPattern: config.reminderPattern,
+          showActiveProspectsCard: config.showActiveProspectsCard,
         }, { onConflict: 'id' });
       if (configErr) throw configErr;
 
@@ -541,6 +548,7 @@ export default function App() {
           reminderNBPDays: Number(dbConfig.reminderNBPDays) || INITIAL_SALES_CONFIG.reminderNBPDays,
           theme: dbConfig.theme || INITIAL_SALES_CONFIG.theme,
           reminderPattern: dbConfig.reminderPattern || INITIAL_SALES_CONFIG.reminderPattern,
+          showActiveProspectsCard: dbConfig.showActiveProspectsCard !== undefined ? !!dbConfig.showActiveProspectsCard : INITIAL_SALES_CONFIG.showActiveProspectsCard,
         };
         setConfig(parsedConfig);
         localStorage.setItem('oxygen_config', JSON.stringify(parsedConfig));

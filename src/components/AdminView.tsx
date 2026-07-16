@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS config (
   "reminderThinkingDays" INTEGER,
   "reminderNBPDays" INTEGER,
   theme TEXT,
-  "reminderPattern" TEXT
+  "reminderPattern" TEXT,
+  "showActiveProspectsCard" BOOLEAN DEFAULT FALSE
 );
 
 -- 3. Create Leads Table

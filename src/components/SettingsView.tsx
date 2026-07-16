@@ -8,7 +8,7 @@ import { motion } from 'motion/react';
 import { 
   Settings, User, Target, Clock, ShieldAlert, 
   Download, Upload, Check, AlertCircle, Sparkles, Moon, Sun,
-  Database, RefreshCw, CloudLightning, Code2
+  Database, RefreshCw, CloudLightning, Code2, UserCheck
 } from 'lucide-react';
 import { SalesConfig, Lead } from '../types';
 
@@ -45,6 +45,7 @@ export default function SettingsView({
   const [reminderNBPDays, setReminderNBPDays] = useState(config.reminderNBPDays);
   const [reminderPattern, setReminderPattern] = useState(config.reminderPattern || '1,2,4,7');
   const [theme, setTheme] = useState<'light' | 'dark'>(config.theme || 'light');
+  const [showActiveProspectsCard, setShowActiveProspectsCard] = useState(config.showActiveProspectsCard ?? false);
   
   const [dbUrl, setDbUrl] = useState(supabaseUrl);
   const [dbKey, setDbKey] = useState(supabaseAnonKey);
@@ -66,6 +67,7 @@ export default function SettingsView({
       reminderNBPDays: Number(reminderNBPDays) || 1,
       theme,
       reminderPattern: reminderPattern.trim() || '1,2,4,7',
+      showActiveProspectsCard,
     });
 
     setSavedSuccess(true);
@@ -88,6 +90,7 @@ export default function SettingsView({
           reminderNBPDays,
           theme,
           reminderPattern,
+          showActiveProspectsCard,
         },
         leads: allLeads,
       };
@@ -137,6 +140,7 @@ export default function SettingsView({
             reminderNBPDays: Number(parsed.config.reminderNBPDays) || reminderNBPDays,
             theme: parsed.config.theme || theme,
             reminderPattern: parsed.config.reminderPattern || reminderPattern,
+            showActiveProspectsCard: parsed.config.showActiveProspectsCard !== undefined ? !!parsed.config.showActiveProspectsCard : showActiveProspectsCard,
           });
           // sync local state
           setMonthlyTarget(parsed.config.monthlyTarget || monthlyTarget);
@@ -145,6 +149,7 @@ export default function SettingsView({
           setReminderNBPDays(parsed.config.reminderNBPDays || reminderNBPDays);
           setTheme(parsed.config.theme || theme);
           setReminderPattern(parsed.config.reminderPattern || reminderPattern);
+          setShowActiveProspectsCard(parsed.config.showActiveProspectsCard !== undefined ? !!parsed.config.showActiveProspectsCard : showActiveProspectsCard);
         }
 
         setImportSuccess(true);
@@ -333,6 +338,26 @@ export default function SettingsView({
                 Peringatan: Tema utama didesain bernuansa "Light" elegan sesuai ketentuan perusahaan. Mode gelap bersifat eksperimental.
               </span>
             )}
+          </div>
+
+          {/* Card Prospek Aktif Toggle */}
+          <div className="pt-2">
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <input 
+                type="checkbox"
+                checked={showActiveProspectsCard}
+                onChange={(e) => setShowActiveProspectsCard(e.target.checked)}
+                className="w-4.5 h-4.5 rounded border-slate-300 dark:border-zinc-700 text-[#F58220] focus:ring-[#F58220] mt-0.5"
+              />
+              <div>
+                <span className={`text-sm font-bold flex items-center gap-1.5 ${config.theme === 'dark' ? 'text-zinc-200' : 'text-slate-800'}`}>
+                  <UserCheck className="w-4 h-4 text-[#F58220]" /> Tampilkan Card Prospek Aktif di Dashboard
+                </span>
+                <span className={`text-[11px] block mt-0.5 ${config.theme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>
+                  Aktifkan ini jika ingin menampilkan card statistik "Prospek Aktif" di halaman dashboard utama. (Default: Dinonaktifkan/Sembunyikan)
+                </span>
+              </div>
+            </label>
           </div>
 
           {/* Save button */}
@@ -562,7 +587,8 @@ CREATE TABLE IF NOT EXISTS config (
   "reminderThinkingDays" INTEGER,
   "reminderNBPDays" INTEGER,
   theme TEXT,
-  "reminderPattern" TEXT
+  "reminderPattern" TEXT,
+  "showActiveProspectsCard" BOOLEAN DEFAULT FALSE
 );
 
 -- 3. Create Leads Table

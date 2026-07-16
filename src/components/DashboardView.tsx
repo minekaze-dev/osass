@@ -603,7 +603,7 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-2 ${config.showActiveProspectsCard ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
         {/* Total Lead */}
         <div className={`p-4 rounded-2xl border shadow-xs transition-shadow flex items-center gap-3 ${
           config.theme === 'dark' ? 'bg-[#18181b] border-zinc-800' : 'bg-white border-slate-100 shadow-xs hover:shadow-md'
@@ -618,17 +618,19 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
         </div>
 
         {/* Prospek Aktif */}
-        <div className={`p-4 rounded-2xl border shadow-xs transition-shadow flex items-center gap-3 ${
-          config.theme === 'dark' ? 'bg-[#18181b] border-zinc-800' : 'bg-white border-slate-100 shadow-xs hover:shadow-md'
-        }`}>
-          <div className={`p-3 rounded-xl ${config.theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
-            <UserCheck className="w-5 h-5" />
+        {config.showActiveProspectsCard && (
+          <div className={`p-4 rounded-2xl border shadow-xs transition-shadow flex items-center gap-3 ${
+            config.theme === 'dark' ? 'bg-[#18181b] border-zinc-800' : 'bg-white border-slate-100 shadow-xs hover:shadow-md'
+          }`}>
+            <div className={`p-3 rounded-xl ${config.theme === 'dark' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+              <UserCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <span className={`text-xs block font-medium ${config.theme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>Prospek Aktif</span>
+              <span className={`text-xl font-bold ${config.theme === 'dark' ? 'text-zinc-100' : 'text-slate-800'}`}>{activeProspects}</span>
+            </div>
           </div>
-          <div>
-            <span className={`text-xs block font-medium ${config.theme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>Prospek Aktif</span>
-            <span className={`text-xl font-bold ${config.theme === 'dark' ? 'text-zinc-100' : 'text-slate-800'}`}>{activeProspects}</span>
-          </div>
-        </div>
+        )}
 
         {/* Reminder Hari Ini */}
         <div className={`p-4 rounded-2xl border shadow-xs transition-shadow flex items-center gap-3 ${
@@ -686,11 +688,11 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
               
               <div className="flex flex-nowrap gap-1 md:gap-1.5 select-none items-center xl:self-center justify-start sm:justify-end">
                 <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[35px] sm:min-w-[45px] ${config.theme === 'dark' ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>General Payment</span>
+                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>GENERAL PAYMENT</span>
                   <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-blue-100' : 'text-blue-700'}`}>{stats.totalGP}</span>
                 </div>
                 <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[35px] sm:min-w-[45px] ${config.theme === 'dark' ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
-                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>Paid</span>
+                  <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-indigo-400' : 'text-indigo-600'}`}>PAID</span>
                   <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-indigo-100' : 'text-indigo-700'}`}>{stats.totalPaid}</span>
                 </div>
                 <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[35px] sm:min-w-[45px] border border-emerald-500/20 ${config.theme === 'dark' ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
@@ -699,7 +701,7 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                 </div>
                 {stats.totalRefund > 0 && (
                   <div className={`px-1.5 py-0.5 md:px-2 md:py-1 rounded-lg flex flex-col items-center justify-center min-w-[35px] sm:min-w-[45px] border border-red-500/20 ${config.theme === 'dark' ? 'bg-red-500/10' : 'bg-red-50'}`}>
-                    <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>Refund</span>
+                    <span className={`text-[7px] md:text-[8px] font-bold tracking-tight whitespace-nowrap ${config.theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>REFUND</span>
                     <span className={`text-[10px] md:text-xs font-black ${config.theme === 'dark' ? 'text-red-100' : 'text-red-700'}`}>{stats.totalRefund}</span>
                   </div>
                 )}

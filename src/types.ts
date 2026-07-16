@@ -93,4 +93,5 @@ export interface SalesConfig {
   reminderNBPDays: number;
   theme: 'light' | 'dark';
   reminderPattern: string; // e.g. "1,2,4,7"
+  showActiveProspectsCard: boolean;
 }
