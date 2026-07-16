@@ -40,9 +40,10 @@ interface DashboardViewProps {
   onViewLead: (lead: Lead, historyOnly?: boolean) => void;
   onUpdateStatus: (lead: Lead) => void;
   onQuickFollowUp: (leadId: string) => void;
+  onAddLeadClick: () => void;
 }
 
-export default function DashboardView({ leads, config, userName, onViewLead, onUpdateStatus, onQuickFollowUp }: DashboardViewProps) {
+export default function DashboardView({ leads, config, userName, onViewLead, onUpdateStatus, onQuickFollowUp, onAddLeadClick }: DashboardViewProps) {
   const TODAY_STR = getTodayStr();
 
   // State for manual daily performance overrides
@@ -580,25 +581,37 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
           </div>
         </div>
         
-        {/* Bulanan Target Progress */}
-        <div className={`w-full md:w-64 p-3.5 rounded-xl border flex flex-col gap-1.5 ${
-          config.theme === 'dark' ? 'bg-zinc-900/50 border-zinc-800' : 'bg-slate-50 border-slate-100'
-        }`}>
-          <div className="flex justify-between items-center text-xs">
-            <span className={`font-semibold ${config.theme === 'dark' ? 'text-zinc-400' : 'text-slate-600'}`}>
-              {selectedMonth === 'All' ? 'Target SA Total' : `Target SA ${formatMonthYear(selectedMonth)}`}
+        {/* Target and Action Wrapper */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+          {/* Bulanan Target Progress */}
+          <div className={`w-full md:w-64 p-3.5 rounded-xl border flex flex-col gap-1.5 justify-center ${
+            config.theme === 'dark' ? 'bg-zinc-900/50 border-zinc-800' : 'bg-slate-50 border-slate-100'
+          }`}>
+            <div className="flex justify-between items-center text-xs">
+              <span className={`font-semibold ${config.theme === 'dark' ? 'text-zinc-400' : 'text-slate-600'}`}>
+                {selectedMonth === 'All' ? 'Target SA Total' : `Target SA ${formatMonthYear(selectedMonth)}`}
+              </span>
+              <span className="font-bold text-[#F58220]">{monthlyClosings} / {config.monthlyTarget} <span className="text-[10px] font-medium opacity-80">({targetProgress}%)</span></span>
+            </div>
+            <div className={`w-full rounded-full h-2 ${config.theme === 'dark' ? 'bg-zinc-800' : 'bg-slate-200'}`}>
+              <div 
+                className="bg-[#F58220] h-2 rounded-full transition-all duration-500" 
+                style={{ width: `${targetProgress}%` }}
+              />
+            </div>
+            <span className={`text-[10px] self-end font-medium ${config.theme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>
+              Progress: {targetProgress}% tercapai
             </span>
-            <span className="font-bold text-[#F58220]">{monthlyClosings} / {config.monthlyTarget} <span className="text-[10px] font-medium opacity-80">({targetProgress}%)</span></span>
           </div>
-          <div className={`w-full rounded-full h-2 ${config.theme === 'dark' ? 'bg-zinc-800' : 'bg-slate-200'}`}>
-            <div 
-              className="bg-[#F58220] h-2 rounded-full transition-all duration-500" 
-              style={{ width: `${targetProgress}%` }}
-            />
-          </div>
-          <span className={`text-[10px] self-end font-medium ${config.theme === 'dark' ? 'text-zinc-500' : 'text-slate-400'}`}>
-            Progress: {targetProgress}% tercapai
-          </span>
+
+          {/* Orange '+ Tambah Leads' Button */}
+          <button
+            onClick={onAddLeadClick}
+            className="px-4 py-3 bg-[#F58220] hover:bg-[#E0721B] text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-xs hover:shadow-md cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap self-stretch sm:h-full min-h-[50px]"
+          >
+            <Plus className="w-4.5 h-4.5 shrink-0" />
+            <span>Tambah Leads</span>
+          </button>
         </div>
       </div>
 

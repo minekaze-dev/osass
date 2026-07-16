@@ -1113,6 +1113,7 @@ export default function App() {
             onViewLead={(lead, historyOnly) => { setIsHistoryOnly(historyOnly || false); setViewLead(lead); }} 
             onUpdateStatus={(lead) => setUpdateLead(lead)} 
             onQuickFollowUp={handleQuickFollowUp}
+            onAddLeadClick={() => setIsQuickAddOpen(true)}
           />
         );
       case 'lead':
@@ -1255,19 +1256,6 @@ export default function App() {
                   >
                     <Home className="w-4 h-4 shrink-0" />
                     <span>Dashboard</span>
-                  </button>
-
-                  {/* Lead */}
-                  <button
-                    onClick={() => setActiveTab('lead')}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      activeTab === 'lead' 
-                        ? config.theme === 'dark' ? 'bg-zinc-800 text-[#F58220]' : 'bg-orange-50 text-[#F58220]' 
-                        : config.theme === 'dark' ? 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                  >
-                    <UserPlus className="w-4 h-4 shrink-0" />
-                    <span>Lead</span>
                   </button>
 
                   {/* Prospek */}
@@ -1501,16 +1489,6 @@ export default function App() {
             </button>
 
             <button
-              onClick={() => setActiveTab('lead')}
-              className={`flex flex-col items-center justify-center w-12 py-1 rounded-lg transition-colors ${
-                activeTab === 'lead' ? 'text-[#F58220]' : config.theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-slate-400'
-              }`}
-            >
-              <UserPlus className="w-5 h-5" />
-              <span className="text-[8px] font-bold mt-1">Lead</span>
-            </button>
-
-            <button
               onClick={() => setActiveTab('prospek')}
               className={`flex flex-col items-center justify-center w-12 py-1 rounded-lg transition-colors ${
                 activeTab === 'prospek' ? 'text-[#F58220]' : config.theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300' : 'text-slate-400'
@@ -1581,7 +1559,7 @@ export default function App() {
 
         {/* ================= FLOATING ACTION BUTTON (FAB) ================= */}
         {!isAdmin && (
-          <div className="fixed bottom-16 right-4 md:bottom-6 md:right-6 z-40">
+          <div className="fixed bottom-16 right-4 z-40 md:hidden">
             <button
               onClick={() => setIsQuickAddOpen(true)}
               className="w-12 h-12 bg-[#F58220] hover:bg-[#E0721B] hover:scale-105 active:scale-95 text-white rounded-full flex items-center justify-center shadow-lg transition-all duration-200 group relative"
