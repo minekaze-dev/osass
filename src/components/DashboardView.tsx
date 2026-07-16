@@ -31,6 +31,7 @@ import {
   isLeadActiveProspect,
   getTodayStr
 } from '../utils/helpers';
+import { supabase } from '../lib/supabase';
 
 interface DashboardViewProps {
   leads: Lead[];
@@ -53,6 +54,37 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
       return {};
     }
   });
+
+  React.useEffect(() => {
+    async function loadFromSupabase() {
+      if (supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('daily_overrides')
+            .select('*');
+          if (!error && data) {
+            const loaded: Record<string, { gp: number; paid: number; sa: number; refund: number }> = {};
+            data.forEach((row: any) => {
+              loaded[row.id] = {
+                gp: Number(row.gp) || 0,
+                paid: Number(row.paid) || 0,
+                sa: Number(row.sa) || 0,
+                refund: Number(row.refund) || 0
+              };
+            });
+            setManualOverrides(prev => {
+              const merged = { ...prev, ...loaded };
+              localStorage.setItem('oxygen_daily_overrides', JSON.stringify(merged));
+              return merged;
+            });
+          }
+        } catch (err) {
+          console.error('Failed to load daily_overrides from Supabase:', err);
+        }
+      }
+    }
+    loadFromSupabase();
+  }, []);
 
   const [isActivityModalOpen, setIsActivityModalOpen] = React.useState(false);
 
@@ -1281,14 +1313,23 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                       if (confirm('Apakah Anda yakin ingin menghapus seluruh data manual untuk periode bulan ini?')) {
                         // Build a clean override list excluding current month
                         const newOverrides = { ...manualOverrides };
+                        const datesToDelete: string[] = [];
                         Object.keys(newOverrides).forEach(key => {
                           if (key.startsWith(selectedMonth)) {
                             delete newOverrides[key];
+                            datesToDelete.push(key);
                           }
                         });
                         setTempOverrides(newOverrides);
                         setManualOverrides(newOverrides);
                         localStorage.setItem('oxygen_daily_overrides', JSON.stringify(newOverrides));
+                        if (supabase && datesToDelete.length > 0) {
+                          supabase.from('daily_overrides').delete().in('id', datesToDelete).then(({ error }) => {
+                            if (error) {
+                              console.error('Failed to delete daily_overrides from Supabase:', error);
+                            }
+                          });
+                        }
                         setIsActivityModalOpen(false);
                       }
                     }}
@@ -1312,6 +1353,26 @@ export default function DashboardView({ leads, config, userName, onViewLead, onU
                     onClick={() => {
                       setManualOverrides(tempOverrides);
                       localStorage.setItem('oxygen_daily_overrides', JSON.stringify(tempOverrides));
+                      if (supabase) {
+                        const rows = Object.entries(tempOverrides).map(([dateStr, rawVal]) => {
+                          const val = rawVal as { gp: number; paid: number; sa: number; refund: number };
+                          return {
+                            id: dateStr,
+                            gp: val.gp,
+                            paid: val.paid,
+                            sa: val.sa,
+                            refund: val.refund,
+                            createdAt: new Date().toISOString()
+                          };
+                        });
+                        if (rows.length > 0) {
+                          supabase.from('daily_overrides').upsert(rows).then(({ error }) => {
+                            if (error) {
+                              console.error('Failed to save daily_overrides to Supabase:', error);
+                            }
+                          });
+                        }
+                      }
                       setIsActivityModalOpen(false);
                     }}
                     className="px-5 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-xl cursor-pointer transition-colors shadow-xs flex items-center gap-1.5"

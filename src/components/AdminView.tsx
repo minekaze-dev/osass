@@ -82,10 +82,21 @@ CREATE TABLE IF NOT EXISTS leads (
   "createdAt" TEXT
 );
 
+-- 3b. Create Daily Overrides Table (for Manual GP, PAID, SA, Refund)
+CREATE TABLE IF NOT EXISTS daily_overrides (
+  id TEXT PRIMARY KEY, -- date string in YYYY-MM-DD format
+  gp INTEGER DEFAULT 0,
+  paid INTEGER DEFAULT 0,
+  sa INTEGER DEFAULT 0,
+  refund INTEGER DEFAULT 0,
+  "createdAt" TEXT
+);
+
 -- 4. Enable Row Level Security (RLS)
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE leads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_overrides ENABLE ROW LEVEL SECURITY;
 
 -- 5. Create RLS Policies for Public Access (Using Anon Key)
 -- Users Policies
@@ -126,6 +137,19 @@ CREATE POLICY "Public Update Leads" ON leads FOR UPDATE USING (true);
 
 DROP POLICY IF EXISTS "Public Delete Leads" ON leads;
 CREATE POLICY "Public Delete Leads" ON leads FOR DELETE USING (true);
+
+-- Daily Overrides Policies
+DROP POLICY IF EXISTS "Public Select Daily Overrides" ON daily_overrides;
+CREATE POLICY "Public Select Daily Overrides" ON daily_overrides FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public Insert Daily Overrides" ON daily_overrides;
+CREATE POLICY "Public Insert Daily Overrides" ON daily_overrides FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Public Update Daily Overrides" ON daily_overrides;
+CREATE POLICY "Public Update Daily Overrides" ON daily_overrides FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Public Delete Daily Overrides" ON daily_overrides;
+CREATE POLICY "Public Delete Daily Overrides" ON daily_overrides FOR DELETE USING (true);
 
 -- 6. Insert Default Admin & Sales Assistant Users
 INSERT INTO users (id, name, code, role, created_at)
