@@ -1128,6 +1128,11 @@ export default function App() {
               const newLeads = leads.map(l => l.id === lead.id ? lead : l);
               saveLeads(newLeads);
             }}
+            onBulkUpdateLeads={(updatedLeads) => {
+              const updatedIds = new Set(updatedLeads.map(ul => ul.id));
+              const newLeads = leads.map(l => updatedIds.has(l.id) ? (updatedLeads.find(ul => ul.id === l.id) || l) : l);
+              saveLeads(newLeads);
+            }}
             onImportLeads={(importedLeads) => {
               const currentUserId = auth.user?.id || 'admin';
               const mapped = importedLeads.map(l => ({

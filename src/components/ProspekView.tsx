@@ -38,12 +38,13 @@ interface ProspekViewProps {
   onViewLead: (lead: Lead, historyOnly?: boolean) => void;
   onUpdateStatus: (lead: Lead) => void;
   onUpdateLead: (lead: Lead) => void;
+  onBulkUpdateLeads?: (updatedLeads: Lead[]) => void;
   onImportLeads?: (importedLeads: Lead[]) => void;
   config: SalesConfig;
   userName: string;
 }
 
-export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdateLead, onImportLeads, config, userName }: ProspekViewProps) {
+export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdateLead, onBulkUpdateLeads, onImportLeads, config, userName }: ProspekViewProps) {
   const [search, setSearch] = useState('');
   const [selectedPipeline, setSelectedPipeline] = useState<string>('All');
   const [selectedStatus, setSelectedStatus] = useState<string>('All');
@@ -53,6 +54,11 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
   const [editingRow, setEditingRow] = useState<string | null>(null);
   const [tempDate, setTempDate] = useState<string>('');
   const [tempSource, setTempSource] = useState<string>('');
+
+  // Bulk Edit selection and values state
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [bulkStatus, setBulkStatus] = useState<string>('');
+  const [bulkSource, setBulkSource] = useState<string>('');
 
   // Handle row edit start
   const startEditing = (lead: Lead) => {
@@ -113,6 +119,101 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
       return dateB - dateA;
     });
   }, [leads, search, selectedPipeline, selectedStatus, selectedArea, selectedDate]);
+
+  // Selection helpers
+  const isAllSelected = useMemo(() => {
+    if (filteredLeads.length === 0) return false;
+    return filteredLeads.every(l => selectedLeadIds.includes(l.id));
+  }, [filteredLeads, selectedLeadIds]);
+
+  const handleSelectAll = () => {
+    if (isAllSelected) {
+      const filteredIds = new Set(filteredLeads.map(l => l.id));
+      setSelectedLeadIds(prev => prev.filter(id => !filteredIds.has(id)));
+    } else {
+      const filteredIds = filteredLeads.map(l => l.id);
+      setSelectedLeadIds(prev => {
+        const union = new Set([...prev, ...filteredIds]);
+        return Array.from(union);
+      });
+    }
+  };
+
+  const handleSelectOne = (id: string) => {
+    setSelectedLeadIds(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(x => x !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  const handleApplyBulkEdit = () => {
+    if (!bulkStatus && !bulkSource) {
+      alert('Silakan pilih Status Baru atau Sumber Data Baru terlebih dahulu!');
+      return;
+    }
+
+    if (selectedLeadIds.length === 0) {
+      alert('Tidak ada prospek yang terpilih!');
+      return;
+    }
+
+    const todayStr = getTodayStr();
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+    const leadsToUpdate = leads.filter(l => selectedLeadIds.includes(l.id));
+    const updatedLeads = leadsToUpdate.map(l => {
+      let updated = { ...l };
+      let notesParts: string[] = [];
+
+      if (bulkSource) {
+        updated.source = bulkSource as any;
+        notesParts.push(`Sumber data diubah massal menjadi: ${bulkSource}`);
+      }
+
+      if (bulkStatus) {
+        const statusVal = bulkStatus as FollowUpStatus;
+        const pipelineVal = getPipelineForStatus(statusVal);
+        updated.status = statusVal;
+        updated.pipeline = pipelineVal;
+        updated.lastFollowUpDate = todayStr;
+        updated.followUpCount = l.followUpCount + 1;
+        notesParts.push(`Status diubah massal menjadi: ${statusVal}`);
+
+        const isActive = pipelineVal === 'Aktif';
+        if (isActive) {
+          updated.closingDate = l.closingDate || todayStr;
+          updated.customerStatus = l.customerStatus || 'Aktif';
+          updated.closingStatus = 'Closed';
+        }
+      }
+
+      const newHistoryEntry = {
+        id: `hist-${Date.now()}-bulk-${Math.random().toString(36).substring(2, 9)}`,
+        date: `${todayStr} ${timeStr}`,
+        status: updated.status,
+        pipeline: updated.pipeline,
+        notes: notesParts.join(', ') + '.',
+      };
+
+      updated.history = [newHistoryEntry, ...l.history];
+      return updated;
+    });
+
+    if (onBulkUpdateLeads) {
+      onBulkUpdateLeads(updatedLeads);
+    } else {
+      updatedLeads.forEach(ul => onUpdateLead(ul));
+    }
+
+    alert(`Berhasil memperbarui ${updatedLeads.length} prospek!`);
+    setSelectedLeadIds([]);
+    setBulkStatus('');
+    setBulkSource('');
+  };
 
   // Helper to parse dates
   const parseIndonesianOrStandardDate = (dateStr: string): string => {
@@ -554,6 +655,78 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
         )}
       </div>
 
+      {/* Bulk Action Panel */}
+      {selectedLeadIds.length > 0 && (
+        <div className="bg-orange-500/10 dark:bg-orange-500/5 border border-orange-500/20 text-slate-800 dark:text-zinc-200 rounded-2xl p-4 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 animate-fade-in shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-[#F58220]/20 text-[#F58220] rounded-xl shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="font-bold text-xs sm:text-sm text-slate-800 dark:text-zinc-100">
+                Kelola {selectedLeadIds.length} Prospek Terpilih
+              </p>
+              <p className="text-[10px] sm:text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
+                Ubah status atau sumber data untuk semua prospek yang dipilih sekaligus.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Bulk Status Select */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">Status:</span>
+              <select
+                value={bulkStatus}
+                onChange={(e) => setBulkStatus(e.target.value)}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-700 dark:text-zinc-300 focus:outline-none focus:border-[#F58220]"
+              >
+                <option value="">-- Lewati --</option>
+                {FOLLOW_UP_STATUSES.map(st => (
+                  <option key={st} value={st}>{st}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Bulk Source Select */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">Sumber:</span>
+              <select
+                value={bulkSource}
+                onChange={(e) => setBulkSource(e.target.value)}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-700 dark:text-zinc-300 focus:outline-none focus:border-[#F58220]"
+              >
+                <option value="">-- Lewati --</option>
+                <option value="-">-</option>
+                {LEAD_SOURCES.map(src => (
+                  <option key={src} value={src}>{src}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleApplyBulkEdit}
+                className="px-4 py-2 bg-[#F58220] hover:bg-[#E0721B] text-white font-bold text-xs rounded-xl transition-all shadow-xs hover:shadow-md cursor-pointer whitespace-nowrap"
+              >
+                Simpan Perubahan
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedLeadIds([]);
+                  setBulkStatus('');
+                  setBulkSource('');
+                }}
+                className="px-4 py-2 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-zinc-300 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Prospect Table View */}
       {filteredLeads.length > 0 ? (
         <div className="bg-white dark:bg-[#1c1c1f] rounded-2xl border border-slate-100 dark:border-zinc-800 shadow-xs overflow-hidden">
@@ -561,6 +734,14 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
             <table className="w-full text-left border-collapse min-w-[500px] md:min-w-full">
               <thead>
                 <tr className="bg-slate-50/70 dark:bg-zinc-900/60 border-b border-slate-100 dark:border-zinc-800 text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+                  <th className="py-2.5 px-3 font-bold whitespace-nowrap text-center w-10">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={handleSelectAll}
+                      className="rounded border-slate-300 dark:border-zinc-700 text-[#F58220] focus:ring-[#F58220] cursor-pointer w-4 h-4"
+                    />
+                  </th>
                   <th className="py-2.5 px-3 font-bold whitespace-nowrap text-center">No</th>
                   <th className="py-2.5 px-3 font-bold whitespace-nowrap">Customer</th>
                   <th className="py-2.5 px-3 font-bold whitespace-nowrap">Telepon</th>
@@ -601,6 +782,16 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
                       transition={{ duration: 0.15, delay: Math.min(idx * 0.02, 0.2) }}
                       className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/40 transition-colors group"
                     >
+                      {/* Checkbox */}
+                      <td className="py-2.5 px-3 text-center w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedLeadIds.includes(prospect.id)}
+                          onChange={() => handleSelectOne(prospect.id)}
+                          className="rounded border-slate-300 dark:border-zinc-700 text-[#F58220] focus:ring-[#F58220] cursor-pointer w-4 h-4"
+                        />
+                      </td>
+
                       {/* Numbering */}
                       <td className="py-2.5 px-3 text-center">
                         <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 font-medium">{idx + 1}</span>
