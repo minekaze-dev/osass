@@ -66,6 +66,25 @@ export default function App() {
   });
   
   const [auth, setAuth] = useState<AuthState>(() => {
+    // Check if this page load is a reload
+    const isReload = (() => {
+      try {
+        const navEntries = performance.getEntriesByType('navigation');
+        if (navEntries.length > 0) {
+          const navType = (navEntries[0] as PerformanceNavigationTiming).type;
+          return navType === 'reload';
+        }
+        return performance.navigation?.type === 1; // TYPE_RELOAD
+      } catch (e) {
+        return false;
+      }
+    })();
+
+    if (!isReload) {
+      localStorage.removeItem('oxygen_auth');
+      return { user: null, isAuthenticated: false };
+    }
+
     const saved = localStorage.getItem('oxygen_auth');
     if (saved) {
       const parsed = JSON.parse(saved);
@@ -152,7 +171,33 @@ export default function App() {
 
   // Prevent going back to authenticated screen after logout via browser back button (bfcache)
   useEffect(() => {
-    const checkAuthStatus = () => {
+    const checkAuthStatus = (e?: PageTransitionEvent | StorageEvent) => {
+      // Check if this is a reload
+      const isReload = (() => {
+        try {
+          const navEntries = performance.getEntriesByType('navigation');
+          if (navEntries.length > 0) {
+            const navType = (navEntries[0] as PerformanceNavigationTiming).type;
+            return navType === 'reload';
+          }
+          return performance.navigation?.type === 1; // TYPE_RELOAD
+        } catch (err) {
+          return false;
+        }
+      })();
+
+      const isBfCache = e && (e as PageTransitionEvent).persisted;
+      const isStorageEvent = e && e.type === 'storage';
+
+      // Only clear if it is NOT a reload and NOT a storage sync event
+      const shouldClear = !isReload || isBfCache;
+
+      if (shouldClear && !isStorageEvent) {
+        localStorage.removeItem('oxygen_auth');
+        setAuth({ user: null, isAuthenticated: false });
+        return;
+      }
+
       const saved = localStorage.getItem('oxygen_auth');
       if (!saved) {
         setAuth({ user: null, isAuthenticated: false });
@@ -162,7 +207,7 @@ export default function App() {
           if (!parsed || !parsed.isAuthenticated) {
             setAuth({ user: null, isAuthenticated: false });
           }
-        } catch (e) {
+        } catch (err) {
           setAuth({ user: null, isAuthenticated: false });
         }
       }
