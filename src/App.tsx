@@ -150,6 +150,39 @@ export default function App() {
     }
   }, [activeTab, dueLeadsCount]);
 
+  // Prevent going back to authenticated screen after logout via browser back button (bfcache)
+  useEffect(() => {
+    const checkAuthStatus = () => {
+      const saved = localStorage.getItem('oxygen_auth');
+      if (!saved) {
+        setAuth({ user: null, isAuthenticated: false });
+      } else {
+        try {
+          const parsed = JSON.parse(saved);
+          if (!parsed || !parsed.isAuthenticated) {
+            setAuth({ user: null, isAuthenticated: false });
+          }
+        } catch (e) {
+          setAuth({ user: null, isAuthenticated: false });
+        }
+      }
+    };
+
+    // Check immediately on mount
+    checkAuthStatus();
+
+    // Listen for pageshow (handling bfcache / browser back button)
+    window.addEventListener('pageshow', checkAuthStatus);
+    
+    // Listen for storage changes (handles log out from another tab/window)
+    window.addEventListener('storage', checkAuthStatus);
+
+    return () => {
+      window.removeEventListener('pageshow', checkAuthStatus);
+      window.removeEventListener('storage', checkAuthStatus);
+    };
+  }, []);
+
   // Initialize data from localStorage or mockData and Sync with Supabase
   useEffect(() => {
     const loadInitialData = async () => {
