@@ -60,6 +60,7 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] = useState<string>('');
   const [bulkSource, setBulkSource] = useState<string>('');
+  const [bulkDate, setBulkDate] = useState<string>('');
 
   // Handle row edit start
   const startEditing = (lead: Lead) => {
@@ -196,8 +197,8 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
   };
 
   const handleApplyBulkEdit = () => {
-    if (!bulkStatus && !bulkSource) {
-      alert('Silakan pilih Status Baru atau Sumber Data Baru terlebih dahulu!');
+    if (!bulkStatus && !bulkSource && !bulkDate) {
+      alert('Silakan pilih Status Baru, Sumber Data Baru, atau Tanggal Baru terlebih dahulu!');
       return;
     }
 
@@ -218,6 +219,11 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
       if (bulkSource) {
         updated.source = bulkSource as any;
         notesParts.push(`Sumber data diubah massal menjadi: ${bulkSource}`);
+      }
+
+      if (bulkDate) {
+        updated.createdAt = bulkDate;
+        notesParts.push(`Tanggal diubah massal menjadi: ${bulkDate}`);
       }
 
       if (bulkStatus) {
@@ -259,11 +265,12 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
     setSelectedLeadIds([]);
     setBulkStatus('');
     setBulkSource('');
+    setBulkDate('');
   };
 
   // Helper to parse dates
-  const parseIndonesianOrStandardDate = (dateStr: string): string => {
-    if (!dateStr) return new Date().toISOString().split('T')[0];
+  const parseIndonesianOrStandardDate = (dateStr: string): string | null => {
+    if (!dateStr) return null;
     
     let str = dateStr.trim().toLowerCase();
     
@@ -319,7 +326,7 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
       }
     } catch (e) {}
 
-    return new Date().toISOString().split('T')[0];
+    return null;
   };
 
   const mapRemarkToStatus = (remark: string): FollowUpStatus => {
@@ -410,7 +417,10 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
             if (dateVal instanceof Date) {
               dateParsed = dateVal.toISOString().split('T')[0];
             } else {
-              dateParsed = parseIndonesianOrStandardDate(String(dateVal));
+              const parsed = parseIndonesianOrStandardDate(String(dateVal));
+              if (parsed) {
+                dateParsed = parsed;
+              }
             }
           }
 
@@ -1011,6 +1021,17 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
                   <option key={src} value={src}>{src}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Bulk Date Input */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">Tanggal:</span>
+              <input
+                type="date"
+                value={bulkDate}
+                onChange={(e) => setBulkDate(e.target.value)}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-slate-700 dark:text-zinc-300 focus:outline-none focus:border-[#F58220]"
+              />
             </div>
 
             {/* Actions */}
