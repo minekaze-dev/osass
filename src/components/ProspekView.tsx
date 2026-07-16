@@ -21,7 +21,8 @@ import {
   getPipelineColorClasses,
   PACKAGE_PRICES,
   LEAD_SOURCES,
-  getTodayStr
+  getTodayStr,
+  isLeadActiveProspect
 } from '../utils/helpers';
 
 const splitPackage = (pkgStr: string) => {
@@ -120,6 +121,15 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
     });
   }, [leads, search, selectedPipeline, selectedStatus, selectedArea, selectedDate]);
 
+  // Split lists into Active and Pool (Inactive/Older than 3 days NBP/Not Coverage/Not Interested)
+  const activeProspectsList = useMemo(() => {
+    return filteredLeads.filter(l => isLeadActiveProspect(l));
+  }, [filteredLeads]);
+
+  const poolProspectsList = useMemo(() => {
+    return filteredLeads.filter(l => !isLeadActiveProspect(l));
+  }, [filteredLeads]);
+
   // Selection helpers
   const isAllSelected = useMemo(() => {
     if (filteredLeads.length === 0) return false;
@@ -134,6 +144,42 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
       const filteredIds = filteredLeads.map(l => l.id);
       setSelectedLeadIds(prev => {
         const union = new Set([...prev, ...filteredIds]);
+        return Array.from(union);
+      });
+    }
+  };
+
+  const isAllActiveSelected = useMemo(() => {
+    if (activeProspectsList.length === 0) return false;
+    return activeProspectsList.every(l => selectedLeadIds.includes(l.id));
+  }, [activeProspectsList, selectedLeadIds]);
+
+  const handleSelectAllActive = () => {
+    if (isAllActiveSelected) {
+      const activeIds = new Set(activeProspectsList.map(l => l.id));
+      setSelectedLeadIds(prev => prev.filter(id => !activeIds.has(id)));
+    } else {
+      const activeIds = activeProspectsList.map(l => l.id);
+      setSelectedLeadIds(prev => {
+        const union = new Set([...prev, ...activeIds]);
+        return Array.from(union);
+      });
+    }
+  };
+
+  const isAllPoolSelected = useMemo(() => {
+    if (poolProspectsList.length === 0) return false;
+    return poolProspectsList.every(l => selectedLeadIds.includes(l.id));
+  }, [poolProspectsList, selectedLeadIds]);
+
+  const handleSelectAllPool = () => {
+    if (isAllPoolSelected) {
+      const poolIds = new Set(poolProspectsList.map(l => l.id));
+      setSelectedLeadIds(prev => prev.filter(id => !poolIds.has(id)));
+    } else {
+      const poolIds = poolProspectsList.map(l => l.id);
+      setSelectedLeadIds(prev => {
+        const union = new Set([...prev, ...poolIds]);
         return Array.from(union);
       });
     }
@@ -438,6 +484,269 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
     e.target.value = '';
   };
 
+  const renderProspectTable = (
+    title: string, 
+    list: Lead[], 
+    isTableAllSelected: boolean, 
+    onSelectAll: () => void,
+    indicatorColor: string,
+    animatePulse: boolean
+  ) => {
+    if (list.length === 0) {
+      return (
+        <div className="mb-6 bg-white dark:bg-[#1c1c1f] rounded-2xl border border-slate-100 dark:border-zinc-800 shadow-xs p-8 text-center">
+          <p className="text-xs text-slate-400 dark:text-zinc-500 font-medium">Tidak ada prospek di kategori ini</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-3">
+          <div className={`w-2.5 h-2.5 rounded-full ${indicatorColor} ${animatePulse ? 'animate-pulse' : ''}`} />
+          <h3 className={`font-bold text-xs sm:text-sm uppercase tracking-wider ${config.theme === 'dark' ? 'text-zinc-300' : 'text-slate-700'}`}>
+            {title} ({list.length})
+          </h3>
+        </div>
+
+        <div className="bg-white dark:bg-[#1c1c1f] rounded-2xl border border-slate-100 dark:border-zinc-800 shadow-xs overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[500px] md:min-w-full">
+              <thead>
+                <tr className="bg-slate-50/70 dark:bg-zinc-900/60 border-b border-slate-100 dark:border-zinc-800 text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+                  <th className="py-2.5 px-3 font-bold whitespace-nowrap text-center w-10">
+                    <input
+                      type="checkbox"
+                      checked={isTableAllSelected}
+                      onChange={onSelectAll}
+                      className="rounded border-slate-300 dark:border-zinc-700 text-[#F58220] focus:ring-[#F58220] cursor-pointer w-4 h-4"
+                    />
+                  </th>
+                  <th className="py-2.5 px-3 font-bold whitespace-nowrap text-center">No</th>
+                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Customer</th>
+                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Telepon</th>
+                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Tanggal</th>
+                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Sumber Data</th>
+                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Status</th>
+                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">FU</th>
+                  <th className="py-2.5 px-3 text-right pr-4 font-bold whitespace-nowrap">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 text-xs text-slate-700 dark:text-zinc-300">
+                {list.map((prospect, idx) => {
+                  const waNumber = formatWhatsAppNumber(prospect.whatsapp);
+                  const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}`;
+
+                  const formatDate = (dateStr: string) => {
+                    if (!dateStr) return '-';
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                    const parts = dateStr.split('-');
+                    if (parts.length === 3) {
+                      const year = parts[0];
+                      const monthIdx = parseInt(parts[1], 10) - 1;
+                      const day = parseInt(parts[2], 10);
+                      return `${day} ${months[monthIdx] || parts[1]} ${year}`;
+                    }
+                    return dateStr;
+                  };
+
+                  return (
+                    <motion.tr
+                      key={prospect.id}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.15, delay: Math.min(idx * 0.02, 0.2) }}
+                      className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/40 transition-colors group"
+                    >
+                      {/* Checkbox */}
+                      <td className="py-2.5 px-3 text-center w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedLeadIds.includes(prospect.id)}
+                          onChange={() => handleSelectOne(prospect.id)}
+                          className="rounded border-slate-300 dark:border-zinc-700 text-[#F58220] focus:ring-[#F58220] cursor-pointer w-4 h-4"
+                        />
+                      </td>
+
+                      {/* Numbering */}
+                      <td className="py-2.5 px-3 text-center">
+                        <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 font-medium">{idx + 1}</span>
+                      </td>
+
+                      {/* Name */}
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <div className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-[13px] truncate max-w-[120px]">
+                          {prospect.name && prospect.name.trim() !== '' && prospect.name !== '-' ? prospect.name : '-'}
+                        </div>
+                      </td>
+
+                      {/* Phone */}
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                         <div className="text-[11px] text-slate-600 dark:text-zinc-300 font-mono">{prospect.whatsapp}</div>
+                      </td>
+
+                      {/* Created At */}
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        {editingRow === prospect.id ? (
+                          <input
+                            type="date"
+                            value={tempDate}
+                            onChange={(e) => setTempDate(e.target.value)}
+                            className="px-1.5 py-0.5 border border-slate-200 rounded-md text-[11px] bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-orange-200 font-mono"
+                          />
+                        ) : (
+                          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-50 text-orange-600 border border-orange-100 dark:text-orange-300 font-bold text-[10px]">
+                            <Calendar className="w-3 h-3 text-[#F58220]" />
+                            <span>{formatDate(prospect.createdAt)}</span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Source */}
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        {editingRow === prospect.id ? (
+                          <select
+                            value={tempSource}
+                            onChange={(e) => setTempSource(e.target.value)}
+                            className="px-1.5 py-0.5 border border-slate-200 dark:border-zinc-700 rounded-md text-[11px] bg-white dark:bg-zinc-900 text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-orange-200"
+                          >
+                            <option value="-">-</option>
+                            {LEAD_SOURCES.map(src => (
+                              <option key={src} value={src}>{src}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                             <Tag className="w-3 h-3 text-[#F58220]" />
+                             <span className="font-bold text-slate-700 dark:text-zinc-200 text-[11px]">{prospect.source || '-'}</span>
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <select
+                          value={prospect.status}
+                          onChange={(e) => {
+                            const newStatus = e.target.value as FollowUpStatus;
+                            const todayStr = getTodayStr();
+                            const now = new Date();
+                            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                            
+                            const newHistoryEntry = {
+                              id: `hist-${Date.now()}-status-quick`,
+                              date: `${todayStr} ${timeStr}`,
+                              status: newStatus,
+                              pipeline: prospect.pipeline,
+                              notes: `Status diubah cepat dari tabel menjadi: ${newStatus}.`,
+                            };
+
+                            onUpdateLead({
+                              ...prospect,
+                              status: newStatus,
+                              history: [newHistoryEntry, ...prospect.history]
+                            });
+                          }}
+                          className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold border cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-200 dark:bg-zinc-900 ${getStatusColorClasses(prospect.status).bg}`}
+                        >
+                          {FOLLOW_UP_STATUSES.map(st => (
+                            <option key={st} value={st} className="bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 font-bold">
+                              {st}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+
+                      {/* Follow-up count */}
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-800 dark:text-zinc-200 text-[10px]">{prospect.followUpCount}x FU</span>
+                          <span className="text-[10px] text-slate-500 dark:text-zinc-400">
+                            {(() => {
+                              if (prospect.followUpCount === 0) return 'Hari ke-0';
+                              const pattern = (config.reminderPattern || '1,2,4,7').split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+                              const day = pattern[prospect.followUpCount - 1] || prospect.followUpCount;
+                              return `Hari ke-${day}`;
+                            })()}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-2.5 px-3 text-right pr-4 whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {editingRow === prospect.id ? (
+                            <>
+                              <button
+                                onClick={() => {
+                                    onUpdateLead({...prospect, createdAt: tempDate, source: tempSource as any});
+                                    setEditingRow(null);
+                                }}
+                                className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all shadow-sm flex items-center justify-center"
+                                title="Simpan"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => setEditingRow(null)}
+                                className="p-1 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg transition-all flex items-center justify-center"
+                                title="Batal"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              {/* Chat WA */}
+                              <a
+                                href={waUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-lg transition-all"
+                                title="WhatsApp"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                              </a>
+
+                              <button
+                                onClick={() => startEditing(prospect)}
+                                className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-bold flex items-center justify-center transition-all border border-amber-200/30"
+                                title="Edit Tanggal"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                onClick={() => onUpdateStatus(prospect)}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg transition-all border border-amber-200/30"
+                                title="Update Status"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" />
+                                <span className="text-[10px] font-bold">Update</span>
+                              </button>
+
+                              <button
+                                onClick={() => onViewLead(prospect, true)}
+                                className="p-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg transition-all"
+                                title="Detail"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
 
@@ -728,246 +1037,7 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
       )}
 
       {/* Prospect Table View */}
-      {filteredLeads.length > 0 ? (
-        <div className="bg-white dark:bg-[#1c1c1f] rounded-2xl border border-slate-100 dark:border-zinc-800 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[500px] md:min-w-full">
-              <thead>
-                <tr className="bg-slate-50/70 dark:bg-zinc-900/60 border-b border-slate-100 dark:border-zinc-800 text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
-                  <th className="py-2.5 px-3 font-bold whitespace-nowrap text-center w-10">
-                    <input
-                      type="checkbox"
-                      checked={isAllSelected}
-                      onChange={handleSelectAll}
-                      className="rounded border-slate-300 dark:border-zinc-700 text-[#F58220] focus:ring-[#F58220] cursor-pointer w-4 h-4"
-                    />
-                  </th>
-                  <th className="py-2.5 px-3 font-bold whitespace-nowrap text-center">No</th>
-                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Customer</th>
-                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Telepon</th>
-                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Tanggal</th>
-                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Sumber Data</th>
-                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">Status</th>
-                  <th className="py-2.5 px-3 font-bold whitespace-nowrap">FU</th>
-                  <th className="py-2.5 px-3 text-right pr-4 font-bold whitespace-nowrap">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-zinc-800 text-xs text-slate-700 dark:text-zinc-300">
-                {filteredLeads.map((prospect, idx) => {
-                  const waNumber = formatWhatsAppNumber(prospect.whatsapp);
-                  const mapQuery = encodeURIComponent(`${prospect.name} ${prospect.address} ${prospect.area}`);
-                  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapQuery}`;
-                  
-                  const waUrl = `https://api.whatsapp.com/send?phone=${waNumber}`;
-
-                  // Helper to format date
-                  const formatDate = (dateStr: string) => {
-                    if (!dateStr) return '-';
-                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-                    const parts = dateStr.split('-');
-                    if (parts.length === 3) {
-                      const year = parts[0];
-                      const monthIdx = parseInt(parts[1], 10) - 1;
-                      const day = parseInt(parts[2], 10);
-                      return `${day} ${months[monthIdx] || parts[1]} ${year}`;
-                    }
-                    return dateStr;
-                  };
-
-                  return (
-                    <motion.tr
-                      key={prospect.id}
-                      initial={{ opacity: 0, y: 4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.15, delay: Math.min(idx * 0.02, 0.2) }}
-                      className="hover:bg-slate-50/50 dark:hover:bg-zinc-800/40 transition-colors group"
-                    >
-                      {/* Checkbox */}
-                      <td className="py-2.5 px-3 text-center w-10">
-                        <input
-                          type="checkbox"
-                          checked={selectedLeadIds.includes(prospect.id)}
-                          onChange={() => handleSelectOne(prospect.id)}
-                          className="rounded border-slate-300 dark:border-zinc-700 text-[#F58220] focus:ring-[#F58220] cursor-pointer w-4 h-4"
-                        />
-                      </td>
-
-                      {/* Numbering */}
-                      <td className="py-2.5 px-3 text-center">
-                        <span className="text-[10px] font-mono text-slate-400 dark:text-zinc-500 font-medium">{idx + 1}</span>
-                      </td>
-
-                      {/* Name */}
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        <div className="font-bold text-slate-800 dark:text-zinc-100 text-xs sm:text-[13px] truncate max-w-[120px]">
-                          {prospect.name && prospect.name.trim() !== '' && prospect.name !== '-' ? prospect.name : '-'}
-                        </div>
-                      </td>
-
-                      {/* Phone */}
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                         <div className="text-[11px] text-slate-600 dark:text-zinc-300 font-mono">{prospect.whatsapp}</div>
-                      </td>
-
-                      {/* Created At (Initial chat date) */}
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        {editingRow === prospect.id ? (
-                          <input
-                            type="date"
-                            value={tempDate}
-                            onChange={(e) => setTempDate(e.target.value)}
-                            className="px-1.5 py-0.5 border border-slate-200 rounded-md text-[11px] bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-orange-200 font-mono"
-                          />
-                        ) : (
-                          <div className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-orange-50 text-orange-600 border border-orange-100 dark:text-orange-300 font-bold text-[10px]">
-                            <Calendar className="w-3 h-3 text-[#F58220]" />
-                            <span>{formatDate(prospect.createdAt)}</span>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Source */}
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        {editingRow === prospect.id ? (
-                          <select
-                            value={tempSource}
-                            onChange={(e) => setTempSource(e.target.value)}
-                            className="px-1.5 py-0.5 border border-slate-200 dark:border-zinc-700 rounded-md text-[11px] bg-white dark:bg-zinc-900 text-slate-800 dark:text-zinc-100 focus:outline-none focus:ring-1 focus:ring-orange-200"
-                          >
-                            <option value="-">-</option>
-                            {LEAD_SOURCES.map(src => (
-                              <option key={src} value={src}>{src}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                             <Tag className="w-3 h-3 text-[#F58220]" />
-                             <span className="font-bold text-slate-700 dark:text-zinc-200 text-[11px]">{prospect.source || '-'}</span>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Status */}
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        <select
-                          value={prospect.status}
-                          onChange={(e) => {
-                            const newStatus = e.target.value as FollowUpStatus;
-                            const todayStr = getTodayStr();
-                            const now = new Date();
-                            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-                            
-                            const newHistoryEntry = {
-                              id: `hist-${Date.now()}-status-quick`,
-                              date: `${todayStr} ${timeStr}`,
-                              status: newStatus,
-                              pipeline: prospect.pipeline,
-                              notes: `Status diubah cepat dari tabel menjadi: ${newStatus}.`,
-                            };
-
-                            onUpdateLead({
-                              ...prospect,
-                              status: newStatus,
-                              history: [newHistoryEntry, ...prospect.history]
-                            });
-                          }}
-                          className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold border cursor-pointer focus:outline-none focus:ring-1 focus:ring-orange-200 dark:bg-zinc-900 ${getStatusColorClasses(prospect.status).bg}`}
-                        >
-                          {FOLLOW_UP_STATUSES.map(st => (
-                            <option key={st} value={st} className="bg-white dark:bg-zinc-800 text-slate-800 dark:text-zinc-100 font-bold">
-                              {st}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-
-                      {/* Follow-up count & optional reminder */}
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-800 dark:text-zinc-200 text-[10px]">{prospect.followUpCount}x FU</span>
-                          <span className="text-[10px] text-slate-500 dark:text-zinc-400">
-                            {(() => {
-                              if (prospect.followUpCount === 0) return 'Hari ke-0';
-                              const pattern = (config.reminderPattern || '1,2,4,7').split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-                              const day = pattern[prospect.followUpCount - 1] || prospect.followUpCount;
-                              return `Hari ke-${day}`;
-                            })()}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="py-2.5 px-3 text-right pr-4 whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {editingRow === prospect.id ? (
-                            <>
-                              <button
-                                onClick={() => {
-                                    onUpdateLead({...prospect, createdAt: tempDate, source: tempSource as any});
-                                    setEditingRow(null);
-                                }}
-                                className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all shadow-sm flex items-center justify-center"
-                                title="Simpan"
-                              >
-                                <Check className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => setEditingRow(null)}
-                                className="p-1 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg transition-all flex items-center justify-center"
-                                title="Batal"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              {/* Chat WA */}
-                              <a
-                                href={waUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-lg transition-all"
-                                title="WhatsApp"
-                              >
-                                <MessageSquare className="w-3.5 h-3.5" />
-                              </a>
-
-                              <button
-                                onClick={() => startEditing(prospect)}
-                                className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg text-[11px] font-bold flex items-center justify-center transition-all border border-amber-200/30"
-                                title="Edit Tanggal"
-                              >
-                                <Edit2 className="w-3.5 h-3.5" />
-                              </button>
-
-                              <button
-                                onClick={() => onUpdateStatus(prospect)}
-                                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded-lg transition-all border border-amber-200/30"
-                                title="Update Status"
-                              >
-                                <RefreshCw className="w-3.5 h-3.5" />
-                                <span className="text-[10px] font-bold">Update</span>
-                              </button>
-
-                              <button
-                                onClick={() => onViewLead(prospect, true)}
-                                className="p-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg transition-all"
-                                title="Detail"
-                              >
-                                <Eye className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </motion.tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
+      {filteredLeads.length === 0 ? (
         <div className="text-center py-16 bg-white dark:bg-[#1c1c1f] rounded-2xl border border-slate-100 dark:border-zinc-800 flex flex-col items-center justify-center gap-3">
           <HelpCircle className="w-12 h-12 text-slate-300 dark:text-zinc-700" />
           <div>
@@ -975,6 +1045,11 @@ export default function ProspekView({ leads, onViewLead, onUpdateStatus, onUpdat
             <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">Coba ubah kata pencarian atau bersihkan filter di atas.</p>
           </div>
         </div>
+      ) : (
+        <>
+          {renderProspectTable("Prospek Aktif", activeProspectsList, isAllActiveSelected, handleSelectAllActive, "bg-emerald-500", true)}
+          {renderProspectTable("Kumpulan Prospek", poolProspectsList, isAllPoolSelected, handleSelectAllPool, "bg-slate-400", false)}
+        </>
       )}
     </div>
   );
